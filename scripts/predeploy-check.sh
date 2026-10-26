@@ -29,8 +29,8 @@ check $? control-plane
 step "agent-adapters"
 (cd "$ROOT/packages/agent-adapters" && PYTHONPATH=.:$ROOT/packages/contracts "$VA/bin/python" -m pytest -q -p no:cacheprovider 2>&1 | tail -2; exit "${PIPESTATUS[0]}")
 check $? agent-adapters
-step "knowledge"
-(cd "$ROOT/services/knowledge" && PYTHONPATH=src "$VK/bin/python" -m pytest -q -p no:cacheprovider 2>&1 | tail -2; exit "${PIPESTATUS[0]}")
+step "knowledge (ruff + tests)"
+(cd "$ROOT/services/knowledge" && "$VC/bin/ruff" check -q . && PYTHONPATH=src "$VK/bin/python" -m pytest -q -p no:cacheprovider 2>&1 | tail -2; exit "${PIPESTATUS[0]}")
 check $? knowledge
 step "mcp-knowledge"
 (cd "$ROOT/packages/mcp-knowledge" && PYTHONPATH=src "$VM/bin/python" -m pytest -q -p no:cacheprovider 2>&1 | tail -2; exit "${PIPESTATUS[0]}")

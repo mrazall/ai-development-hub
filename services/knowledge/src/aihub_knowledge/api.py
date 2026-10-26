@@ -103,7 +103,7 @@ class DraftRequest(BaseModel):
 # Agents write only here: the one writable folder of the vault (the rest is mounted read-only).
 DRAFTS_DIR = "_Агенты"
 DRAFT_STATUSES = ("new", "applied", "dismissed")
-_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n?", re.S)
+_FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n?", re.DOTALL)
 
 
 def _drafts_root() -> Path:

@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 from aihub_knowledge import api
 from aihub_knowledge.acl import Principal, sign_principal
-from aihub_knowledge.db import DocumentRow, session_factory
 from aihub_knowledge.api import clean_excerpt
+from aihub_knowledge.db import DocumentRow, session_factory
 
 
 def test_clean_excerpt_removes_markdown_and_obsidian_controls():
