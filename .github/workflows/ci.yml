@@ -45,7 +45,7 @@ jobs:
           python -m venv /tmp/v-knowledge && /tmp/v-knowledge/bin/pip install -q ruff pytest -e packages/contracts -e services/knowledge
           python -m venv /tmp/v-mcp && /tmp/v-mcp/bin/pip install -q pytest -e packages/mcp-knowledge
       - name: Ruff
-        run: /tmp/v-control/bin/ruff check services/control-plane packages && /tmp/v-knowledge/bin/ruff check services/knowledge
+        run: (cd services/control-plane && /tmp/v-control/bin/ruff check .) && (cd services/knowledge && /tmp/v-knowledge/bin/ruff check .)
       - name: control-plane (unit, integration, user scenarios)
         working-directory: services/control-plane
         run: /tmp/v-control/bin/python -m pytest -q
