@@ -19,6 +19,7 @@ import type { Attachment } from '../api/types-ops';
 import { ago, useApi } from '../api/useApi';
 import { DeleteSessionButton } from '../components/DeleteSessionButton';
 import { ConfirmDialog, Dialog, ErrorBanner, Loading, SplitPane, StatusBadge, StatusIcon } from '../components/ui';
+import { Icon } from '../components/ui/icons';
 import { ChatComposer } from '../components/ChatComposer';
 import { SessionTerminal } from '../components/Terminal';
 import { MarkdownView } from '../components/MarkdownView';
@@ -778,6 +779,20 @@ function NewSessionDialog({
     executor_model: 'gpt-5.6-luna',
   });
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachError, setAttachError] = useState('');
+  // Picked or pasted files add up (same limits as the session composer); they upload when the session starts.
+  const addAttachments = (list: File[]) => {
+    setAttachError('');
+    const tooBig = list.find((file) => file.size > 20 * 1024 * 1024);
+    if (tooBig) return setAttachError(t('{0}: файл больше 20 МБ.', tooBig.name));
+    setAttachments((current) => {
+      if (current.length + list.length > 10) {
+        setAttachError(t('Можно прикрепить не больше 10 файлов.'));
+        return current;
+      }
+      return [...current, ...list];
+    });
+  };
   const [manualMerge, setManualMerge] = useState(false);
   const [error, setError] = useState('');
   const account = accounts.data?.find((item) => item.id === form.account_profile_id);
@@ -794,19 +809,27 @@ function NewSessionDialog({
   const info = useApi<{ demo: boolean }>('/system/info');
   const engineOptions = info.data?.demo ? MOCK_ENGINES : availableEngines.length ? availableEngines : [...engines];
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  // A subscription account runs only its own CLI: the engine list follows the chosen account.
+  const allowedEngines = engineOptions.filter(
+    (engine) =>
+      !account ||
+      (account.kind === 'claude_code_subscription'
+        ? engine === 'claude_code'
+        : account.kind === 'codex_subscription'
+          ? engine === 'codex'
+          : true),
+  );
   useEffect(() => {
-    // The default engine may not be offered here (a demo has only mock engines): take the first one that is.
-    if (!engineOptions.includes(form.engine)) update('engine', engineOptions[0]);
-  }, [engineOptions.join(','), form.engine]);
+    // Keep the state equal to what the select shows: the default engine may not be offered here (a demo has
+    // only mock engines), or the chosen account may not run it (a Claude account cannot run Codex).
+    if (!allowedEngines.includes(form.engine)) update('engine', allowedEngines[0] ?? engineOptions[0] ?? 'codex');
+  }, [allowedEngines.join(','), form.engine]);
   useEffect(() => {
     if (!form.worker_id && workers.data) {
       const online = workers.data.find((worker) => worker.status === 'online');
       if (online) update('worker_id', online.id);
     }
   }, [form.worker_id, workers.data]);
-  useEffect(() => {
-    if (!engineOptions.includes(form.engine)) update('engine', engineOptions[0] ?? 'codex');
-  }, [form.engine, engineOptions.join(',')]);
   useEffect(() => {
     if (!form.account_profile_id && accounts.data) {
       const matching = accounts.data.find((item) => item.worker_id === form.worker_id && item.status === 'connected');
@@ -1034,19 +1057,9 @@ function NewSessionDialog({
           <label>
             {t('Движок')}
             <select value={form.engine} onChange={(event) => update('engine', event.target.value)}>
-              {engineOptions
-                .filter(
-                  (engine) =>
-                    !account ||
-                    (account.kind === 'claude_code_subscription'
-                      ? engine === 'claude_code'
-                      : account.kind === 'codex_subscription'
-                        ? engine === 'codex'
-                        : true),
-                )
-                .map((engine) => (
-                  <option key={engine}>{engine}</option>
-                ))}
+              {allowedEngines.map((engine) => (
+                <option key={engine}>{engine}</option>
+              ))}
             </select>
           </label>
         )}
@@ -1060,16 +1073,56 @@ function NewSessionDialog({
             required
             value={form.prompt}
             onChange={(event) => update('prompt', event.target.value)}
-            placeholder={t('Что должен сделать агент?')}
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              if (!event.dataTransfer.files.length) return;
+              event.preventDefault();
+              addAttachments(Array.from(event.dataTransfer.files));
+            }}
+            onPaste={(event) => {
+              const pasted = Array.from(event.clipboardData.files);
+              if (pasted.length) {
+                event.preventDefault();
+                addAttachments(pasted);
+              }
+            }}
+            placeholder={t('Что должен сделать агент? Файлы можно вставить сюда (Ctrl+V)')}
           />
         </label>
-        {form.mode === 'orchestrated' && (
-          <label className="attachment-picker">
-            {t('Прикрепить файлы к ТЗ')}
-            <input type="file" multiple onChange={(event) => setAttachments(Array.from(event.target.files ?? []))} />
-            {attachments.length > 0 && <small>{attachments.map((file) => file.name).join(', ')}</small>}
+        <div className="attachment-picker">
+          <span className="attachment-picker-label">
+            {form.mode === 'orchestrated' ? t('Прикрепить файлы к ТЗ') : t('Прикрепить файлы')}
+          </span>
+          <label className="button-secondary attachment-picker-button">
+            <Icon name="attach" size={15} /> {t('Выбрать файлы')}
+            <input
+              type="file"
+              multiple
+              hidden
+              onChange={(event) => {
+                addAttachments(Array.from(event.target.files ?? []));
+                event.currentTarget.value = '';
+              }}
+            />
           </label>
-        )}
+          {attachments.length > 0 && (
+            <div className="attachment-chips" aria-label={t('Прикреплённые файлы')}>
+              {attachments.map((file, index) => (
+                <span key={`${file.name}-${index}`} className="attachment-chip">
+                  <Icon name={file.type.startsWith('image/') ? 'image' : 'file'} size={15} /> {file.name}
+                  <button
+                    type="button"
+                    aria-label={t('Удалить {0}', file.name)}
+                    onClick={() => setAttachments((current) => current.filter((_, at) => at !== index))}
+                  >
+                    <Icon name="close" size={14} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {attachError && <small className="field-error">{attachError}</small>}
+        </div>
         <label>
           {t('Ветка')}
           <input value={form.branch} onChange={(event) => update('branch', event.target.value)} placeholder="main" />

@@ -135,14 +135,15 @@ export function ChatComposer({ sessionId, resumable = false, onContinued }: Comp
       )}
       <input
         aria-label={t('Сообщение агенту')}
-        placeholder={t('Написать агенту… Перетащите файл сюда')}
+        placeholder={t('Написать агенту… Файл: перетащите или вставьте (Ctrl+V)')}
         value={text}
         onChange={(event) => setText(event.target.value)}
         onPaste={(event) => {
-          const images = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'));
-          if (images.length) {
+          // Screenshots and files copied in a file manager arrive as clipboard files; plain text pastes as usual.
+          const pasted = Array.from(event.clipboardData.files);
+          if (pasted.length) {
             event.preventDefault();
-            void addFiles(images);
+            void addFiles(pasted);
           }
         }}
       />

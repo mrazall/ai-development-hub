@@ -817,4 +817,9 @@ export const en: Record<string, string> = {
   доступен: 'available',
   'ошибка проверки': 'check failed',
   'не проверялся хабом': 'not checked by the hub',
+  'Написать агенту… Файл: перетащите или вставьте (Ctrl+V)': 'Message the agent… Files: drop or paste (Ctrl+V)',
+  'Что должен сделать агент? Файлы можно вставить сюда (Ctrl+V)':
+    'What should the agent do? You can paste files here (Ctrl+V)',
+  'Прикрепить файлы': 'Attach files',
+  'Выбрать файлы': 'Choose files',
 };

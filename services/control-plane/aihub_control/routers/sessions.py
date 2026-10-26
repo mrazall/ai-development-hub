@@ -7,7 +7,7 @@ from ..auth import current_principal, current_user, db_dep, write_user
 from ..deps import project_or_404
 from sqlalchemy import delete, text
 
-from ..models import AgentEvent, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
+from ..models import AccountProfile, AgentEvent, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
 from ..redaction import redact
 from ..schemas import ContinueIn, EventIn, EventOut, SessionIn, SessionOut, StatusIn
 from ..deps import is_admin
@@ -19,9 +19,21 @@ from ..orchestration.auto_resume import resume_session, schedule_if_limited
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
+# A subscription profile is the login of one CLI: Codex started with a Claude profile has no OpenAI login (401).
+ENGINE_OF_ACCOUNT = {"claude_code_subscription": "claude_code", "codex_subscription": "codex"}
+
+
+def _check_engine_matches_account(db, engine: str, account_profile_id: str | None) -> None:
+    account = db.get(AccountProfile, account_profile_id) if account_profile_id else None
+    expected = ENGINE_OF_ACCOUNT.get(account.kind) if account else None
+    if expected and engine != expected:
+        raise HTTPException(422, f"аккаунт {account.id} работает только с движком {expected}, выбран {engine}")
+
+
 @router.post("", response_model=SessionOut)
 def create_session(data: SessionIn, user=Depends(write_user), db=Depends(db_dep)):
     project_or_404(db, user, data.project_id)
+    _check_engine_matches_account(db, data.engine, data.account_profile_id)
     session = Session(**data.model_dump(exclude={"hold"}), **({"status": "draft"} if data.hold else {}))
     db.add(session)
     db.commit()

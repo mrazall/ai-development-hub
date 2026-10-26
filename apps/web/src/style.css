@@ -4478,3 +4478,19 @@ h1 {
   font-size: 0.85rem;
   text-align: center;
 }
+
+/* New-session dialog: files picked, pasted or dropped before the session starts. */
+.attachment-picker {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.attachment-picker-label {
+  font-weight: 600;
+}
+.attachment-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
