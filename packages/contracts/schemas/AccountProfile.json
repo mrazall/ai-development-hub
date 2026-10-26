@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "AccountKind": {
+      "enum": [
+        "claude_code_subscription",
+        "codex_subscription",
+        "anthropic_api",
+        "openai_api",
+        "gemini_api",
+        "openrouter",
+        "ollama",
+        "openai_compatible"
+      ],
+      "title": "AccountKind",
+      "type": "string"
+    },
+    "AccountStatus": {
+      "enum": [
+        "pending_login",
+        "connected",
+        "error",
+        "disabled"
+      ],
+      "title": "AccountStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Metadata only. Secrets never live here: subscription auth stays in the profile's isolated config dir on the\nworker; API keys live in a worker-side secret file referenced by `secret_ref` (fingerprint for display).",
+  "properties": {
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/AccountKind"
+    },
+    "worker_id": {
+      "title": "Worker Id",
+      "type": "string"
+    },
+    "config_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Config Dir"
+    },
+    "base_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Base Url"
+    },
+    "secret_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Secret Ref"
+    },
+    "secret_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Secret Fingerprint"
+    },
+    "default_model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Default Model"
+    },
+    "models": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Models",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/AccountStatus",
+      "default": "pending_login"
+    },
+    "status_detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status Detail"
+    },
+    "checked_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checked At"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "kind",
+    "worker_id",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "AccountProfile",
+  "type": "object"
+}

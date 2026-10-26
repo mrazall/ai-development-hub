@@ -1,0 +1,173 @@
+.chat-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+.mode-switch {
+  display: grid;
+  gap: 0.45rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0.7rem;
+}
+.mode-switch legend {
+  padding: 0 0.3rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.mode-switch label {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+.mode-switch input {
+  accent-color: var(--accent);
+}
+.attachment-picker input {
+  padding: 0.45rem;
+}
+.executor-panel {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.executor-panel .panel-heading {
+  align-items: center;
+}
+.executor-panel .panel-heading h2 {
+  margin: 0;
+}
+.executor-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+.executor-card p {
+  margin: 0.2rem 0;
+  font-size: 0.82rem;
+}
+.executor-card a {
+  color: var(--accent);
+  font-weight: 650;
+  font-size: 0.84rem;
+}
+.chat-form input {
+  min-width: 0;
+  flex: 1;
+}
+.attachment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+  background: var(--bg-elevated);
+}
+.attachment-chip small {
+  color: var(--text-muted);
+}
+.attachment-chip button {
+  min-width: 2rem;
+  min-height: 2rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.attachment-preview {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.35rem;
+  object-fit: cover;
+}
+.project-lifecycle,
+.project-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.button-danger {
+  background: var(--status-error);
+  color: white;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+}
+.button-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.ops-project-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid color-mix(in srgb, var(--status-warning) 48%, var(--border-subtle));
+  border-radius: 999px;
+  color: var(--status-warning);
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 68%);
+}
+.modal-backdrop .modal-body {
+  width: min(32rem, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.ops-inline-error {
+  width: 100%;
+  color: var(--status-error);
+}
+.ops-inline-error a {
+  color: inherit;
+  font-weight: 650;
+}
+.ops-toast-action,
+.ops-toast-close {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 700;
+}
+.ops-toast-action {
+  text-decoration: underline;
+}
+.ops-toast-close {
+  font-size: 1.2rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop {
+    transition: none;
+  }
+}

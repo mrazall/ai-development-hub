@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "NotificationCategory": {
+      "enum": [
+        "task.completed",
+        "agent.failed",
+        "approval.required",
+        "worker.offline",
+        "account.auth_failed",
+        "backup.failed",
+        "service.down"
+      ],
+      "title": "NotificationCategory",
+      "type": "string"
+    },
+    "NotificationSeverity": {
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "title": "NotificationSeverity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "category": {
+      "$ref": "#/$defs/NotificationCategory"
+    },
+    "severity": {
+      "$ref": "#/$defs/NotificationSeverity"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "body": {
+      "default": "",
+      "title": "Body",
+      "type": "string"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Session Id"
+    },
+    "link": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Link"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "read_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Read At"
+    }
+  },
+  "required": [
+    "id",
+    "category",
+    "severity",
+    "title",
+    "created_at"
+  ],
+  "title": "Notification",
+  "type": "object"
+}

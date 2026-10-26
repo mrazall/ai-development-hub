@@ -1,0 +1,12 @@
+{"type":"thread.started","thread_id":"t-1"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"i-1","type":"command_execution","command":"printf hello","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"i-1","type":"command_execution","command":"printf hello","aggregated_output":"hello\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"i-2","type":"command_execution","command":"git status --short","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"i-2","type":"command_execution","command":"git status --short","aggregated_output":" M README.md\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"i-3","type":"file_change","changes":[{"path":"README.md","kind":"modified"}]}}
+{"type":"item.completed","item":{"id":"i-4","type":"agent_message","text":"Готово"}}
+{"type":"turn.completed","usage":{"input_tokens":123,"cached_input_tokens":4,"output_tokens":17}}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"i-5","type":"agent_message","text":"Второй ответ"}}
+{"type":"turn.completed","usage":{"input_tokens":2,"output_tokens":3}}

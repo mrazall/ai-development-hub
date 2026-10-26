@@ -1,0 +1,108 @@
+name: CI
+# Every push and pull request: lint, all Python test suites against real Postgres and Qdrant (including the
+# user-scenario tests with a live mock worker), the web panel, compose files and a secrets scan.
+# No paid models are called: agents in tests are the built-in mock engines.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env: {POSTGRES_DB: aihub, POSTGRES_USER: aihub, POSTGRES_PASSWORD: ci-only}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U aihub -d aihub" --health-interval 2s --health-timeout 5s --health-retries 30
+      qdrant:
+        image: qdrant/qdrant:v1.15.4
+        ports: ['6333:6333']
+    env:
+      AIHUB_DATABASE_URL: postgresql+psycopg://aihub@127.0.0.1:5432/aihub
+      AIHUB_DB_PASSWORD: ci-only
+      AIHUB_QDRANT_URL: http://127.0.0.1:6333
+      AIHUB_REQUIRE_INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12', cache: pip}
+      - name: Install
+        run: >-
+          python -m pip install ruff pytest
+          -e packages/contracts -e packages/agent-adapters -e packages/mcp-knowledge
+          -e services/control-plane -e services/knowledge
+      - name: Ruff
+        run: ruff check services/control-plane services/knowledge packages
+      - name: control-plane (unit, integration, user scenarios)
+        working-directory: services/control-plane
+        run: python -m pytest -q
+      - name: agent-adapters
+        working-directory: packages/agent-adapters
+        run: python -m pytest -q
+      - name: knowledge
+        working-directory: services/knowledge
+        run: python -m pytest -q
+      - name: mcp-knowledge
+        working-directory: packages/mcp-knowledge
+        run: python -m pytest -q
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: npm, cache-dependency-path: apps/web/package-lock.json}
+      - working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npx prettier --check src e2e
+          npm run lint
+          npm run typecheck
+          npm run build
+
+  compose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose files are valid
+        run: |
+          secrets="$RUNNER_TEMP/secrets"; sh infra/scripts/init-secrets.sh "$secrets"
+          touch "$secrets/backup-api-token"
+          export AIHUB_SECRETS_HOST_DIR="$secrets" AIHUB_VAULT_HOST_DIR="$RUNNER_TEMP/vault"
+          docker compose -f infra/docker-compose.yml config -q
+          docker compose -f infra/docker-compose.quickstart.yml config -q
+          AIHUB_PUBLIC_URL=https://hub.example.ts.net AIHUB_WEB_HOST_DIR=/tmp AIHUB_TAILSCALE_RUN_DIR=/tmp \
+            docker compose -f infra/docker-compose.yml -f deploy/home-server/docker-compose.home.yml config -q
+
+  quickstart:
+    # Builds the images and boots the demo exactly as a new user would.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/quickstart.sh --demo
+      - name: The panel answers
+        run: curl -fsS http://127.0.0.1:58080/api/v0/health
+      - if: always()
+        run: ./scripts/quickstart.sh --down
+
+  secrets:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo
+          ghcr.io/gitleaks/gitleaks:v8.18.4 detect --source . --no-banner --redact

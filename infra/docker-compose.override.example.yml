@@ -1,0 +1,7 @@
+services:
+  control-plane:
+    environment:
+      AIHUB_LOG_LEVEL: debug
+  knowledge:
+    environment:
+      AIHUB_LOG_LEVEL: debug

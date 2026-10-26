@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "Visibility": {
+      "enum": [
+        "private",
+        "shared",
+        "public"
+      ],
+      "title": "Visibility",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "repo_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Repo Url"
+    },
+    "visibility": {
+      "$ref": "#/$defs/Visibility",
+      "default": "private"
+    },
+    "allowed_paths": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Paths",
+      "type": "array"
+    },
+    "allowed_commands": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Commands",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Project",
+  "type": "object"
+}

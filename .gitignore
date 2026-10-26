@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+infra/secrets/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.claude/settings.local.json
+.cache/
+dist/
+*.tsbuildinfo
+test-results/
+playwright-report/
+scripts/dev/.dev-users
+apps/web/e2e/screenshots/
+/.dev-users
+.venv-dev/
+.data/
+
+# Claude Code subagent worktrees
+.claude/worktrees/
+.claude/launch.json
+.aihub/

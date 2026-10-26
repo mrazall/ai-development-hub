@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "doc_id": {
+      "title": "Doc Id",
+      "type": "string"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "heading": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Heading"
+    },
+    "excerpt": {
+      "title": "Excerpt",
+      "type": "string"
+    },
+    "line_start": {
+      "title": "Line Start",
+      "type": "integer"
+    },
+    "line_end": {
+      "title": "Line End",
+      "type": "integer"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Project Id"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "score": {
+      "title": "Score",
+      "type": "number"
+    },
+    "match": {
+      "pattern": "^(lexical|vector|hybrid)$",
+      "title": "Match",
+      "type": "string"
+    }
+  },
+  "required": [
+    "doc_id",
+    "path",
+    "title",
+    "excerpt",
+    "line_start",
+    "line_end",
+    "project_id",
+    "updated_at",
+    "score",
+    "match"
+  ],
+  "title": "SearchHit",
+  "type": "object"
+}

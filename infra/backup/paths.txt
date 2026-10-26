@@ -1,0 +1,8 @@
+# Stage 5 inventory (review before configuring restic)
+projects/                 # Git repositories, including uncommitted and untracked files
+vault/                    # Markdown Vault
+infra/                    # Compose configuration and runbooks (never infra/secrets)
+backups/postgres/         # pg_dump output, not a live PG data directory
+knowledge/exports/        # Qdrant exports/metadata, when enabled
+sessions/                 # Session and event exports
+workers/                  # Worker configuration, excluding credentials

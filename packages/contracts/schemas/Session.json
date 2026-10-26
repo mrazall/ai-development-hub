@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "AuthMode": {
+      "enum": [
+        "subscription",
+        "api_key",
+        "openrouter",
+        "local"
+      ],
+      "title": "AuthMode",
+      "type": "string"
+    },
+    "Engine": {
+      "enum": [
+        "claude_code",
+        "codex",
+        "opencode",
+        "gemini"
+      ],
+      "title": "Engine",
+      "type": "string"
+    },
+    "SessionStatus": {
+      "enum": [
+        "queued",
+        "starting",
+        "running",
+        "waiting_approval",
+        "blocked",
+        "offline",
+        "failed",
+        "completed"
+      ],
+      "title": "SessionStatus",
+      "type": "string"
+    },
+    "StatusSource": {
+      "enum": [
+        "native",
+        "cli_parser",
+        "heartbeat"
+      ],
+      "title": "StatusSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "task_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Task Id"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "worker_id": {
+      "title": "Worker Id",
+      "type": "string"
+    },
+    "engine": {
+      "$ref": "#/$defs/Engine"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "auth_mode": {
+      "$ref": "#/$defs/AuthMode"
+    },
+    "workdir": {
+      "title": "Workdir",
+      "type": "string"
+    },
+    "branch": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Branch"
+    },
+    "status": {
+      "$ref": "#/$defs/SessionStatus",
+      "default": "queued"
+    },
+    "status_source": {
+      "$ref": "#/$defs/StatusSource",
+      "default": "heartbeat"
+    },
+    "external_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "External Ref"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "worker_id",
+    "engine",
+    "provider",
+    "model",
+    "auth_mode",
+    "workdir",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Session",
+  "type": "object"
+}

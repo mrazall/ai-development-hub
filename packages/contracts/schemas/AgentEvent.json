@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "EventKind": {
+      "enum": [
+        "session.status",
+        "tool.call",
+        "tool.result",
+        "message",
+        "output",
+        "approval.request",
+        "approval.decision",
+        "diff",
+        "test.result",
+        "checkpoint",
+        "handoff",
+        "heartbeat"
+      ],
+      "title": "EventKind",
+      "type": "string"
+    },
+    "StatusSource": {
+      "enum": [
+        "native",
+        "cli_parser",
+        "heartbeat"
+      ],
+      "title": "StatusSource",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Append-only. cursor — монотонный номер, назначает сервер; по нему replay после переподключения.",
+  "properties": {
+    "cursor": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cursor"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "session_id": {
+      "format": "uuid",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/EventKind"
+    },
+    "source": {
+      "$ref": "#/$defs/StatusSource"
+    },
+    "ts": {
+      "format": "date-time",
+      "title": "Ts",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Payload",
+      "type": "object"
+    },
+    "redacted": {
+      "default": false,
+      "title": "Redacted",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "session_id",
+    "kind",
+    "source",
+    "ts"
+  ],
+  "title": "AgentEvent",
+  "type": "object"
+}

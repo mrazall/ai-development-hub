@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "TaskStatus": {
+      "enum": [
+        "draft",
+        "ready",
+        "in_progress",
+        "review",
+        "done",
+        "cancelled"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Id"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "body": {
+      "default": "",
+      "title": "Body",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/TaskStatus",
+      "default": "draft"
+    },
+    "depends_on": {
+      "default": [],
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "title": "Depends On",
+      "type": "array"
+    },
+    "idempotency_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Idempotency Key"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "title",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Task",
+  "type": "object"
+}

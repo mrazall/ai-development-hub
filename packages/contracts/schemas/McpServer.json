@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "McpTransport": {
+      "enum": [
+        "stdio",
+        "http"
+      ],
+      "title": "McpTransport",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "license": {
+      "title": "License",
+      "type": "string"
+    },
+    "transport": {
+      "$ref": "#/$defs/McpTransport"
+    },
+    "command": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Command",
+      "type": "array"
+    },
+    "url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Url"
+    },
+    "scopes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Scopes",
+      "type": "array"
+    },
+    "project_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Project Ids",
+      "type": "array"
+    },
+    "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "status": {
+      "default": "unknown",
+      "title": "Status",
+      "type": "string"
+    },
+    "status_detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status Detail"
+    },
+    "tools": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "source",
+    "version",
+    "license",
+    "transport"
+  ],
+  "title": "McpServer",
+  "type": "object"
+}

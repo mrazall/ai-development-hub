@@ -1,0 +1,19 @@
+# Tailscale for the hub, in a container. Run it next to the stack:
+#   mkdir -p ~/aihub/tailscale/run && cp deploy/home-server/tailscale/docker-compose.yml ~/aihub/tailscale/
+#   cd ~/aihub/tailscale && docker compose up -d && docker exec aihub_tailscale tailscale up
+#   docker exec aihub_tailscale tailscale serve --bg 127.0.0.1:8000   # the panel, tailnet only
+# Never use `tailscale funnel` for the hub: it would publish it to the internet.
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.104.1
+    container_name: aihub_tailscale
+    hostname: hub
+    network_mode: host
+    entrypoint: ["tailscaled", "--tun=userspace-networking", "--state=/var/lib/tailscale/tailscaled.state", "--statedir=/var/lib/tailscale", "--socket=/var/run/tailscale/tailscaled.sock"]
+    volumes:
+      - ./state:/var/lib/tailscale
+      # The LocalAPI socket, shared read-only with the hub for the System health page.
+      - ./run:/var/run/tailscale
+    mem_limit: 256m
+    cpus: 0.5
+    restart: unless-stopped

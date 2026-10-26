@@ -1,0 +1,415 @@
+/* settings-mobile — owned by one executor; uses only Monochrome Signal tokens from style.css. */
+
+/* The settings family contains long provider URLs, fingerprints and worker hosts.
+   Keep overflow local to the data surface; the application shell must never grow. */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.account-grid,
+.mcp-grid,
+.backup-grid,
+.limits-grid {
+  min-width: 0;
+}
+
+.account-card,
+.mcp-card,
+.backup-card,
+.limit-card,
+.panel,
+.notice,
+.auth-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-card dl,
+.mcp-card dl,
+.backup-card dl {
+  min-width: 0;
+}
+
+.account-card dd,
+.mcp-card dd,
+.backup-card dd,
+.secret,
+.document,
+.login-step-command code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.document,
+.login-step-command {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.card-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.card-actions > button,
+.card-actions > select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Selects share a row but stay readable ("Claude Code", a project name), never squeezed to one letter. */
+.card-actions > select {
+  flex: 1 1 9rem;
+  min-width: 9rem;
+}
+
+.notification-list li {
+  min-width: 0;
+  gap: 1rem;
+}
+
+.notification-list li > div:first-child {
+  min-width: 0;
+}
+
+.notification-list .event-meta {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+button,
+input,
+select,
+textarea {
+  min-height: 2.25rem;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .page-heading,
+  .panel-heading,
+  .limits-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .page-heading > *,
+  .limits-heading > * {
+    max-width: 100%;
+  }
+
+  .project-layout,
+  .account-grid,
+  .mcp-grid,
+  .backup-grid,
+  .limits-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .toolbar,
+  .ui-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .toolbar label,
+  .ui-toolbar label,
+  .toolbar select,
+  .ui-toolbar select {
+    min-width: min(100%, 12rem);
+    max-width: 100%;
+  }
+
+  .notification-list li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .notification-list li > button {
+    align-self: flex-start;
+  }
+
+  .backup-status-row {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .backup-status-row > * {
+    min-width: 0;
+  }
+
+  .auth {
+    padding: 1rem;
+  }
+
+  .auth-card {
+    width: min(100%, 28rem);
+  }
+
+  .modal {
+    max-width: calc(100vw - 1rem);
+    margin: 0.5rem;
+  }
+
+  .modal-body {
+    max-height: calc(100dvh - 6rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Settings surface contract. These rules are deliberately scoped to the settings
+   family so the shared shell can be integrated by its owner without conflicts. */
+.settings-links,
+.account-card,
+.mcp-card,
+.backup-card,
+.limit-card,
+.backup-status-panel,
+.auth-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-links a {
+  display: flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.settings-links a:hover,
+.settings-links a:focus-visible {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+}
+
+.ui-badge {
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 650;
+}
+
+.ui-badge::before {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.ui-badge-success {
+  color: var(--status-success);
+}
+.ui-badge-danger {
+  color: var(--status-error);
+}
+.ui-badge-warning {
+  color: var(--status-warning);
+}
+.ui-badge-neutral {
+  color: var(--text-secondary);
+}
+
+.account-grid,
+.mcp-grid,
+.backup-grid,
+.limits-grid {
+  align-items: stretch;
+}
+
+.account-card,
+.mcp-card,
+.backup-card,
+.limit-card {
+  padding: 1rem;
+}
+
+.account-card h2,
+.mcp-card h2,
+.backup-card h2,
+.limit-card h2 {
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.account-card dl,
+.mcp-card dl,
+.backup-card dl {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.7fr) minmax(0, 1.3fr);
+  gap: 0.55rem 1rem;
+}
+
+.account-card dt,
+.mcp-card dt,
+.backup-card dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.account-card dd,
+.mcp-card dd,
+.backup-card dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.card-actions {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.card-actions button,
+.card-actions select,
+.create-form button,
+.auth-card button {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.card-actions button:hover,
+.create-form button:hover,
+.auth-card button:hover {
+  background: var(--bg-hover);
+}
+
+.notice {
+  border-color: var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--text-secondary);
+}
+
+.notice strong {
+  color: var(--text-primary);
+}
+
+.backup-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.backup-status-row {
+  min-width: 0;
+}
+
+.backup-status-row > span {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.table-wrap,
+.panel:has(> .table) {
+  min-width: 0;
+}
+
+.panel:has(> .table) {
+  overflow-x: auto;
+}
+
+.panel:has(> .table) .table {
+  min-width: 42rem;
+}
+
+.auth {
+  background: var(--bg-canvas);
+}
+
+.auth-card {
+  width: min(100%, 27rem);
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+
+.auth-card h1 {
+  color: var(--text-primary);
+  font-size: clamp(1.6rem, 5vw, 2.25rem);
+}
+
+.auth-card button.ui-button-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.auth-card button.ui-button-primary:hover {
+  background: var(--accent-hover);
+}
+
+.limit-bar {
+  border-radius: var(--radius-xs);
+  background: var(--bg-active);
+}
+
+.limit-bar span,
+.limit-bar.warning span,
+.limit-bar.danger span {
+  background: var(--accent);
+}
+
+.limit-bar.danger span {
+  background: var(--status-error);
+}
+
+.limit-stale,
+.backup-error {
+  color: var(--status-error);
+}
+
+@media (max-width: 767px) {
+  .backup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account-card dl,
+  .mcp-card dl,
+  .backup-card dl {
+    grid-template-columns: minmax(5.5rem, 0.65fr) minmax(0, 1.35fr);
+  }
+
+  .panel:has(> .table) {
+    margin-inline: 0;
+  }
+
+  .panel:has(> .table) .table {
+    min-width: 38rem;
+  }
+
+  .limit-card-footer {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}

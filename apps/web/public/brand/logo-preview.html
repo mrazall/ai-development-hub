@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nodes — логотип AI Development Hub</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg: #141414;
+        --surface: #1c1c1c;
+        --text: #f0f0ed;
+        --muted: #a6a6a1;
+        --border: #2e2e2c;
+        font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 32px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 28px;
+        letter-spacing: -0.02em;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 32px 0 12px;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      p {
+        color: var(--muted);
+        margin: 0;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 28px;
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .row.light {
+        background: #f4f4f2;
+        border-color: #e4e4e0;
+        color: #1f1f1e;
+      }
+      .cell {
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .light .cell {
+        color: #6b6b67;
+      }
+      img {
+        display: block;
+        image-rendering: auto;
+      }
+      .cell.mono-white {
+        color: #fff;
+      }
+      .cell.mono-black {
+        color: #000;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: -0.02em;
+      }
+      .tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 220px;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0 0;
+        background: #2a2a2a;
+        font-size: 12px;
+      }
+      .light .tab {
+        background: #dededa;
+      }
+      .sidebar {
+        width: 220px;
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      .sidebar .lockup {
+        font-size: 15px;
+      }
+      .folded {
+        width: 40px;
+        padding: 12px 0;
+        display: grid;
+        justify-items: center;
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      .pwa img {
+        border-radius: 22%;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Nodes — знак AI Development Hub</h1>
+      <p>Simplified Mark · Monochrome Signal. До 24 px — компактная версия, от 32 px — основная.</p>
+
+      <h2>Размеры на тёмном фоне</h2>
+      <div class="row" id="dark"></div>
+      <h2>Размеры на светлом фоне</h2>
+      <div class="row light" id="light"></div>
+      <h2>Монохромные версии (currentColor)</h2>
+      <div class="row" id="mono-white"></div>
+      <div class="row light" id="mono-black" style="margin-top: 12px"></div>
+
+      <h2>Горизонтальная композиция</h2>
+      <div class="row">
+        <span class="lockup"><img src="/brand/logo-nodes.svg" width="32" height="32" alt="" />AI Development Hub</span>
+        <span class="lockup" style="font-size: 15px"
+          ><img src="/brand/logo-nodes-compact.svg" width="24" height="24" alt="" />AI Development Hub</span
+        >
+      </div>
+      <div class="row light" style="margin-top: 12px">
+        <span class="lockup"
+          ><img src="/brand/logo-nodes-light.svg" width="32" height="32" alt="" />AI Development Hub</span
+        >
+        <span class="lockup" style="font-size: 15px"
+          ><img src="/brand/logo-nodes-compact-light.svg" width="24" height="24" alt="" />AI Development Hub</span
+        >
+      </div>
+
+      <h2>Sidebar, вкладка браузера, PWA</h2>
+      <div class="row">
+        <div class="sidebar">
+          <span class="lockup"
+            ><img src="/brand/logo-nodes-compact.svg" width="24" height="24" alt="" />AI Development Hub</span
+          >
+        </div>
+        <div class="folded">
+          <img src="/brand/logo-nodes-compact.svg" width="24" height="24" alt="AI Development Hub" />
+        </div>
+        <div class="tab"><img src="/favicon-16.png" width="16" height="16" alt="" />AI Development Hub</div>
+        <div class="cell pwa"><img src="/icons/icon-192.png" width="96" height="96" alt="" />PWA 192</div>
+        <div class="cell pwa"><img src="/apple-touch-icon.png" width="60" height="60" alt="" />Apple 180</div>
+      </div>
+      <div class="row light" style="margin-top: 12px">
+        <div class="tab"><img src="/favicon.ico" width="16" height="16" alt="" />AI Development Hub</div>
+      </div>
+    </main>
+    <!-- external: the app CSP forbids inline scripts -->
+    <script src="/brand/logo-preview.js"></script>
+  </body>
+</html>

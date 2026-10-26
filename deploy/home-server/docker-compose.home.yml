@@ -1,0 +1,41 @@
+# Home server override: the stack on one Linux box, the panel published to your tailnet only.
+# Used with infra/docker-compose.yml (see deploy/home-server/install.sh):
+#   docker compose -p aihub -f infra/docker-compose.yml -f deploy/home-server/docker-compose.home.yml
+# Values here are deployment defaults; most can be changed later in Settings → System.
+services:
+  control-plane:
+    environment:
+      AIHUB_WEB_DIR: /app/web
+      AIHUB_KNOWLEDGE_URL: http://knowledge:8000
+      AIHUB_BACKUP_TOKEN_FILE: /run/secrets/backup_api_token
+      # The address workers and agents use to reach the hub, e.g. https://hub.<your-tailnet>.ts.net
+      AIHUB_PUBLIC_URL: ${AIHUB_PUBLIC_URL:?set AIHUB_PUBLIC_URL}
+      # Codeman terminals embedded in the panel (optional), e.g. https://*.<your-tailnet>.ts.net:8443
+      AIHUB_FRAME_SRC: ${AIHUB_FRAME_SRC:-}
+      # tailscaled LocalAPI socket (deploy/home-server/tailscale): the health page reads the node status.
+      AIHUB_TAILSCALE_SOCKET: /run/tailscale/tailscaled.sock
+      # «Apply to vault»: a worker that holds a git checkout of the same vault (optional).
+      AIHUB_VAULT_WORKER_ID: ${AIHUB_VAULT_WORKER_ID:-}
+      AIHUB_VAULT_WORKDIR: ${AIHUB_VAULT_WORKDIR:-}
+    secrets: [postgres_password, control_secret_key, internal_secret, backup_api_token]
+    volumes:
+      # Built panel (apps/web/dist), shipped with each release; read-only.
+      - ${AIHUB_WEB_HOST_DIR:?set AIHUB_WEB_HOST_DIR}:/app/web:ro
+      - ${AIHUB_TAILSCALE_RUN_DIR:?set AIHUB_TAILSCALE_RUN_DIR}:/run/tailscale:ro
+
+  knowledge:
+    environment:
+      # Real embeddings from a local Ollama; the default stack uses a deterministic hash backend.
+      AIHUB_EMBED_BACKEND: ollama
+      AIHUB_OLLAMA_URL: ${AIHUB_OLLAMA_URL:-http://host.docker.internal:11434}
+      AIHUB_EMBEDDING_MODEL: ${AIHUB_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+      # Keep indexing from starving other workloads on a small host.
+      AIHUB_EMBEDDING_RATE_PER_SECOND: "2"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      # The vault itself is mounted read-only by the base compose; only the agents' drafts folder is writable.
+      - ${AIHUB_VAULT_HOST_DIR:?set AIHUB_VAULT_HOST_DIR}/_Агенты:/vault/_Агенты
+
+secrets:
+  backup_api_token:
+    file: ${AIHUB_SECRETS_HOST_DIR}/backup-api-token

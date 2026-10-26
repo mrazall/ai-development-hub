@@ -1,0 +1,30 @@
+[project]
+name = "aihub-control"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy>=2.0",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.13",
+  "pydantic-settings>=2.5",
+  "argon2-cffi>=23.1",
+  "PyJWT>=2.9",
+  "python-multipart>=0.0.9",
+  "httpx2>=2.16",
+]
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[tool.setuptools.packages.find]
+include = ["aihub_control*"]
+[project.scripts]
+aihub-control = "aihub_control.cli:main"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires local PostgreSQL"]
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+ignore = ["B008", "BLE001", "E501", "F401", "I001", "RUF012", "UP017"]

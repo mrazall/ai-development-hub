@@ -1,0 +1,53 @@
+# Quickstart overlay: the hub with its web panel in one image, no database ports on the host, and (with the
+# `demo` profile) a containerised worker running the built-in mock engines. Used by scripts/quickstart.sh:
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.quickstart.yml [--profile demo] up -d
+services:
+  postgres:
+    ports: !reset []
+  qdrant:
+    ports: !reset []
+  knowledge:
+    ports: !reset []
+
+  control-plane:
+    build:
+      context: ..
+      dockerfile: infra/docker/hub.Dockerfile
+    image: aihub/hub:${AIHUB_VERSION:-dev}
+    environment:
+      AIHUB_WEB_DIR: /app/web
+      AIHUB_KNOWLEDGE_URL: http://knowledge:8000
+      AIHUB_PUBLIC_URL: ${AIHUB_PUBLIC_URL:-http://control-plane:8000}
+      AIHUB_DEMO: ${AIHUB_DEMO:-0}
+    volumes:
+      - control_data:/data
+      - shared:/shared   # demo: the worker token handed to the demo worker
+
+  migrate-control:
+    image: aihub/hub:${AIHUB_VERSION:-dev}
+    build:
+      context: ..
+      dockerfile: infra/docker/hub.Dockerfile
+
+  demo-worker:
+    profiles: [demo]
+    build:
+      context: ..
+      dockerfile: infra/docker/worker.Dockerfile
+    image: aihub/worker:${AIHUB_VERSION:-dev}
+    restart: unless-stopped
+    volumes:
+      - shared:/shared:ro
+      - demo_work:/work
+    depends_on:
+      control-plane: {condition: service_healthy}
+    networks: [aihub]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: "1.0"
+
+volumes:
+  shared:
+  demo_work:

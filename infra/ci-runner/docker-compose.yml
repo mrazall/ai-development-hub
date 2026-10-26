@@ -1,0 +1,33 @@
+# Self-hosted GitHub Actions runner for the hub repository.
+# Set in ./.env: AIHUB_RUNNER_REPO_URL (https://github.com/<owner>/<repo>), AIHUB_RUNNER_WORK (absolute host path),
+# AIHUB_RUNNER_NAME (optional).
+# Регистрация: владелец кладёт одноразовый токен в ./token (umask 077); после первой регистрации
+# конфигурация раннера хранится в ./state, файл токена удаляется.
+# Рабочий каталог смонтирован по ОДИНАКОВОМУ пути на хосте и в контейнере: задачи CI запускают
+# docker compose через docker.sock хоста, и bind-пути разрешаются на хосте.
+services:
+  runner:
+    image: ghcr.io/actions/actions-runner:2.338.0
+    container_name: ${AIHUB_RUNNER_NAME:-aihub-ci}
+    user: root
+    restart: unless-stopped
+    environment:
+      RUNNER_ALLOW_RUNASROOT: "1"
+      RUNNER_MANUALLY_TRAP_SIG: "1"
+      AIHUB_RUNNER_WORK: ${AIHUB_RUNNER_WORK:?set AIHUB_RUNNER_WORK}
+      AIHUB_RUNNER_REPO_URL: ${AIHUB_RUNNER_REPO_URL:?set AIHUB_RUNNER_REPO_URL}
+      AIHUB_RUNNER_NAME: ${AIHUB_RUNNER_NAME:-aihub-ci}
+      TMPDIR: ${AIHUB_RUNNER_WORK}/_tmp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${AIHUB_RUNNER_WORK}:${AIHUB_RUNNER_WORK}
+      - ./state:/state
+      - ./token:/run/aihub/token:ro
+      - ./start.sh:/start.sh:ro
+    entrypoint: ["bash", "/start.sh"]
+    # Jobs publish throwaway Postgres/Qdrant ports on the host's 127.0.0.1 via docker.sock;
+    # the runner must share the host network namespace to reach them.
+    network_mode: host
+    mem_limit: 8g
+    cpus: 4
+    pids_limit: 2000

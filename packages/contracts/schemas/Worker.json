@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "WorkerKind": {
+      "enum": [
+        "local",
+        "ssh",
+        "codeman"
+      ],
+      "title": "WorkerKind",
+      "type": "string"
+    },
+    "WorkerStatus": {
+      "enum": [
+        "online",
+        "offline",
+        "draining"
+      ],
+      "title": "WorkerStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "host": {
+      "title": "Host",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/WorkerKind"
+    },
+    "status": {
+      "$ref": "#/$defs/WorkerStatus"
+    },
+    "labels": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Labels",
+      "type": "array"
+    },
+    "last_heartbeat_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Heartbeat At"
+    },
+    "lease_ttl_s": {
+      "default": 60,
+      "title": "Lease Ttl S",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "host",
+    "kind",
+    "status"
+  ],
+  "title": "Worker",
+  "type": "object"
+}

@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.tsc/e2e"
+  },
+  "include": [
+    "e2e",
+    "playwright.config.ts"
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "BackupKind": {
+      "enum": [
+        "vault",
+        "projects",
+        "db",
+        "config",
+        "sessions"
+      ],
+      "title": "BackupKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "repo": {
+      "title": "Repo",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/$defs/BackupKind"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
+    },
+    "ok": {
+      "title": "Ok",
+      "type": "boolean"
+    },
+    "size_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Size Bytes"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "repo",
+    "kind",
+    "started_at",
+    "ok"
+  ],
+  "title": "BackupSnapshot",
+  "type": "object"
+}

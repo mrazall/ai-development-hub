@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "DocStatus": {
+      "enum": [
+        "active",
+        "draft",
+        "deprecated",
+        "duplicate"
+      ],
+      "title": "DocStatus",
+      "type": "string"
+    },
+    "DocType": {
+      "enum": [
+        "overview",
+        "architecture",
+        "decision",
+        "task",
+        "handoff",
+        "incident",
+        "runbook",
+        "pattern",
+        "research",
+        "system"
+      ],
+      "title": "DocType",
+      "type": "string"
+    },
+    "Visibility": {
+      "enum": [
+        "private",
+        "shared",
+        "public"
+      ],
+      "title": "Visibility",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Frontmatter документа Vault (ТЗ 5.1).",
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Project Id"
+    },
+    "type": {
+      "$ref": "#/$defs/DocType"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "source_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Commit"
+    },
+    "status": {
+      "$ref": "#/$defs/DocStatus",
+      "default": "active"
+    },
+    "visibility": {
+      "$ref": "#/$defs/Visibility",
+      "default": "private"
+    },
+    "schema_version": {
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "path": {
+      "title": "Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "type",
+    "title",
+    "updated_at",
+    "source",
+    "path"
+  ],
+  "title": "KnowledgeDocument",
+  "type": "object"
+}
