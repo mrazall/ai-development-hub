@@ -36,25 +36,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12', cache: pip}
+      # One virtualenv per part, as in production: the knowledge service and the MCP server pin
+      # different anyio majors and must not share an environment.
       - name: Install
-        run: >-
-          python -m pip install ruff pytest
-          -e packages/contracts -e packages/agent-adapters -e packages/mcp-knowledge
-          -e services/control-plane -e services/knowledge
+        run: |
+          python -m venv /tmp/v-control && /tmp/v-control/bin/pip install -q ruff pytest -e packages/contracts -e packages/agent-adapters -e packages/mcp-knowledge -e services/control-plane
+          python -m venv /tmp/v-agents && /tmp/v-agents/bin/pip install -q pytest -e packages/contracts -e packages/agent-adapters
+          python -m venv /tmp/v-knowledge && /tmp/v-knowledge/bin/pip install -q ruff pytest -e packages/contracts -e services/knowledge
+          python -m venv /tmp/v-mcp && /tmp/v-mcp/bin/pip install -q pytest -e packages/mcp-knowledge
       - name: Ruff
-        run: ruff check services/control-plane services/knowledge packages
+        run: /tmp/v-control/bin/ruff check services/control-plane packages && /tmp/v-knowledge/bin/ruff check services/knowledge
       - name: control-plane (unit, integration, user scenarios)
         working-directory: services/control-plane
-        run: python -m pytest -q
+        run: /tmp/v-control/bin/python -m pytest -q
       - name: agent-adapters
         working-directory: packages/agent-adapters
-        run: python -m pytest -q
+        run: /tmp/v-agents/bin/python -m pytest -q
       - name: knowledge
         working-directory: services/knowledge
-        run: python -m pytest -q
+        run: /tmp/v-knowledge/bin/python -m pytest -q
       - name: mcp-knowledge
         working-directory: packages/mcp-knowledge
-        run: python -m pytest -q
+        run: /tmp/v-mcp/bin/python -m pytest -q
 
   web:
     runs-on: ubuntu-24.04
@@ -81,7 +84,7 @@ jobs:
           touch "$secrets/backup-api-token"
           export AIHUB_SECRETS_HOST_DIR="$secrets" AIHUB_VAULT_HOST_DIR="$RUNNER_TEMP/vault"
           docker compose -f infra/docker-compose.yml config -q
-          docker compose -f infra/docker-compose.quickstart.yml config -q
+          docker compose -f infra/docker-compose.yml -f infra/docker-compose.quickstart.yml config -q
           AIHUB_PUBLIC_URL=https://hub.example.ts.net AIHUB_WEB_HOST_DIR=/tmp AIHUB_TAILSCALE_RUN_DIR=/tmp \
             docker compose -f infra/docker-compose.yml -f deploy/home-server/docker-compose.home.yml config -q
 

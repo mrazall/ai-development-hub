@@ -15,6 +15,9 @@ sh infra/scripts/init-secrets.sh "$SECRETS"      # creates only missing files, u
 for name in restic-aihub-password backup-api-token; do
   [ -s "$SECRETS/$name" ] || (umask 077; openssl rand -base64 36 | tr -d '\n' > "$SECRETS/$name")
 done
+# Containers run as uid 1000 and Compose bind-mounts secret files with host ownership: make the files
+# readable inside the containers. The directory stays 0700, so other host users still cannot reach them.
+chmod 700 "$SECRETS"; chmod 644 "$SECRETS"/*
 [ -d "$VAULT" ] || { echo "vault $VAULT missing"; exit 1; }
 # Agents' drafts: the one writable folder of the vault. Created here (not by Docker as root) so the
 # knowledge container (uid 1000) can write into it.

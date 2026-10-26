@@ -30,6 +30,9 @@ docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required"
 mkdir -p "$STATE"
 chmod 700 "$STATE"
 sh infra/scripts/init-secrets.sh "$STATE/secrets"
+# Containers run as uid 1000 and Compose bind-mounts secret files with host ownership: make the files
+# readable inside the containers. The directory stays 0700, so other host users still cannot reach them.
+chmod 700 "$STATE/secrets"; chmod 644 "$STATE/secrets"/*
 if [ ! -s "$STATE/admin-password" ]; then
   (umask 077; openssl rand -base64 18 | tr -d '/+=\n' > "$STATE/admin-password")
 fi
