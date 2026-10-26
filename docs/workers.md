@@ -34,7 +34,7 @@ engines always can).
 |---|---|---|
 | `--control-plane` | — | hub URL |
 | `--worker-id`, `--token-file` | — | identity |
-| `--enable-engines` | none | real engines this worker may run: `claude_code`, `codex`, `opencode` |
+| `--enable-engines` | none | real engines this worker may run: `claude_code`, `codex` |
 | `--max-session-seconds` | 3600 | timeout of a run (orchestrators: `AIHUB_ORCHESTRATOR_MAX_SECONDS`, up to 4 h) |
 | `--codeman-url` | — | optional Codeman web terminal on this machine |
 | `AIHUB_WORKER_MAX_PARALLEL` | 6 | sessions at a time |

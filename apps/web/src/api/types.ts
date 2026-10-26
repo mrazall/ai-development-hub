@@ -49,6 +49,7 @@ export type Session = {
   task_id: string | null;
   project_id: string;
   worker_id: string;
+  permission_mode?: string;
   engine: string;
   provider: string;
   model: string;

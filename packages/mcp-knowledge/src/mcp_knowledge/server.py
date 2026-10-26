@@ -243,6 +243,38 @@ if os.environ.get("AIHUB_ORCH_SESSION", "").strip():
         mcp.tool(name=_name)(_function)
 
 
+
+def permission_request(
+    tool_name: Annotated[str, Field(min_length=1, max_length=255)],
+    input: dict | None = None,  # noqa: A002 - the name Claude Code passes
+    tool_use_id: str | None = None,
+) -> str:
+    """Claude Code --permission-prompt-tool: ask the owner in the panel and wait for the decision."""
+    import json
+    import time
+    session_id = os.environ.get("AIHUB_PERMISSION_SESSION", "").strip()
+    client = _client()
+    try:
+        request = client.permission_request(session_id, tool_name, input or {})
+        status = request.get("status")
+        # The approval expires on the hub (default TTL); poll until it is decided or expired.
+        while status == "pending":
+            time.sleep(3)
+            status = client.permission_status(session_id, request["id"]).get("status")
+        if status == "approved":
+            return json.dumps({"behavior": "allow", "updatedInput": input or {}})
+        reason = "the owner rejected this action" if status == "rejected" else "the approval request expired"
+        return json.dumps({"behavior": "deny", "message": f"Not allowed: {reason}. Do not retry it; continue without it or stop."})
+    finally:
+        client.close()
+
+
+# "Ask" sessions: the worker sets AIHUB_PERMISSION_SESSION, and Claude Code runs with
+# --permission-prompt-tool mcp__knowledge__permission_request.
+if os.environ.get("AIHUB_PERMISSION_SESSION", "").strip():
+    # Claude Code accepts only a single text block from a permission prompt tool: no structured copy.
+    mcp.tool(name="permission_request", structured_output=False)(permission_request)
+
 def main() -> None:
     mcp.run()
 

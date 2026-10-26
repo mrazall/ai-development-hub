@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — first public release
+## 0.1.0-alpha — first public release
 
 - Workspace: agent sessions on your own machines (Claude Code, Codex, mock engines) with live output, a shell,
   chat, events, file changes and attachments; auto-resume when a subscription limit refills.

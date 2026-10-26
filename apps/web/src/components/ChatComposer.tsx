@@ -21,10 +21,19 @@ type ComposerProps = {
   /** A finished Claude session is woken up through "continue" instead of an event nobody reads. */
   resumable?: boolean;
   onContinued?: (sessionId: string) => void;
+  /** Claude Code permissions of the session; set → the composer offers to change them for the continuation. */
+  permissionMode?: string;
 };
 
-export function ChatComposer({ sessionId, resumable = false, onContinued }: ComposerProps): JSX.Element {
+export function ChatComposer({
+  sessionId,
+  resumable = false,
+  onContinued,
+  permissionMode,
+}: ComposerProps): JSX.Element {
   const [text, setText] = useState('');
+  const [mode, setMode] = useState(permissionMode ?? 'edits');
+  useEffect(() => setMode(permissionMode ?? 'edits'), [permissionMode, sessionId]);
   useEffect(() => {
     // «Ответить» on a selected phrase in the feed: quote it at the top of the message.
     const onQuote = (event: Event) => setText((current) => `${(event as CustomEvent<string>).detail}${current}`);
@@ -81,7 +90,11 @@ export function ChatComposer({ sessionId, resumable = false, onContinued }: Comp
       if (resumable) {
         const next = await api<{ id: string }>(`/sessions/${sessionId}/continue`, {
           method: 'POST',
-          body: JSON.stringify({ text: text.trim(), attachment_ids: attachmentIds }),
+          body: JSON.stringify({
+            text: text.trim(),
+            attachment_ids: attachmentIds,
+            ...(permissionMode ? { permission_mode: mode } : {}),
+          }),
         });
         onContinued?.(next.id);
       } else {
@@ -165,6 +178,20 @@ export function ChatComposer({ sessionId, resumable = false, onContinued }: Comp
           event.currentTarget.value = '';
         }}
       />
+      {resumable && permissionMode && (
+        <select
+          className="composer-permissions"
+          aria-label={t('Права агента')}
+          title={t('Права агента для продолжения')}
+          value={mode}
+          onChange={(event) => setMode(event.target.value)}
+        >
+          <option value="edits">{t('Только правки')}</option>
+          <option value="ask">{t('Спрашивать')}</option>
+          <option value="auto">{t('Авто')}</option>
+          <option value="all">{t('Разрешить всё')}</option>
+        </select>
+      )}
       <button disabled={busy || (!text.trim() && files.length === 0)}>{busy ? t('Отправка…') : t('Отправить')}</button>
     </form>
   );

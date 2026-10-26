@@ -295,3 +295,17 @@ def test_chat_command_can_reach_the_home_directory(tmp_path):
 def test_claude_uses_the_effort_a_chat_chose(tmp_path):
     command = ClaudeCodeAdapter(workdir=tmp_path, prompt="hi", effort="high").command
     assert command[command.index("--effort") + 1] == "high"
+
+
+def test_claude_permission_modes(tmp_path):
+    def flags(**kwargs):
+        argv = ClaudeCodeAdapter("/profile", tmp_path, "sonnet", "x", **kwargs).command
+        return argv[argv.index("--permission-mode") + 1], "--permission-prompt-tool" in argv, "--tools" in argv
+
+    assert flags() == ("acceptEdits", False, False)
+    assert flags(permission_mode="auto") == ("auto", False, False)
+    assert flags(permission_mode="all") == ("bypassPermissions", False, False)
+    # Ask goes through the hub MCP permission tool; a workspace session keeps the full tool set.
+    assert flags(permission_mode="ask", mcp_config="/tmp/m.json", lean_tools=False) == ("acceptEdits", True, False)
+    # Without the MCP server there is nobody to ask: no prompt tool.
+    assert flags(permission_mode="ask") == ("acceptEdits", False, False)

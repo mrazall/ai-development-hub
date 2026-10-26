@@ -45,8 +45,10 @@ multi-tenant or internet-facing service.
   0600 mounted as Docker secrets, never environment values in Git. Agent output is passed through a redaction
   filter (API keys, tokens, private keys, high-entropy strings) before it is stored or shown.
 - **Folders.** A session's working directory must be inside the project's allowed paths; the worker refuses
-  anything else. Claude Code runs with `acceptEdits` (no blanket bypass); Codex runs with its
-  `workspace-write` sandbox.
+  anything else. Codex runs with its `workspace-write` sandbox. Claude Code runs in the mode chosen for the
+  session: *edits only* (default; commands are denied), *ask* (each other action needs your approval in the
+  panel, through a token scoped to that session's permission requests), *auto* (Claude Code's auto mode) or
+  *allow everything* (`bypassPermissions` — use only for workers you would trust with a shell).
 - **Notes.** The vault is mounted read-only into the knowledge service; agents can only write drafts into
   `_Агенты/`, and nothing reaches the vault until a person presses *Apply*. Applying is a git commit that
   can be reverted.

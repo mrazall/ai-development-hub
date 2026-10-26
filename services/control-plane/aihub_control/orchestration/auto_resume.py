@@ -79,7 +79,8 @@ def schedule_if_limited(db, session: Session, now: datetime | None = None) -> da
     return session.resume_at
 
 
-def resume_session(db, original: Session, text: str, attachment_ids=None, model=None, fresh=False, effort=None) -> Session:
+def resume_session(db, original: Session, text: str, attachment_ids=None, model=None, fresh=False, effort=None,
+                   permission_mode=None, user=None) -> Session:
     """Continue a finished session: orchestration roles in place, others as a child that keeps the conversation."""
     original.resume_at = None
     if original.role in {"orchestrator", "executor"}:
@@ -113,7 +114,14 @@ def resume_session(db, original: Session, text: str, attachment_ids=None, model=
         pinned=original.pinned,
         archived=original.archived,
         mcp_config={**(original.mcp_config or {}), **({"effort": effort} if effort else {})} if original.mcp_config or effort else None,
+        permission_mode=permission_mode or original.permission_mode,
     )
+    if child.permission_mode == "ask" and child.engine == "claude_code" and not (child.mcp_config or {}).get("user_id"):
+        # "Ask" needs the hub MCP permission tool and a user to issue its scoped token for.
+        owner_id = user.id if user else (original.mcp_config or {}).get("user_id")
+        if owner_id:
+            from ..routers.chats import _mcp_config
+            child.mcp_config = {**(child.mcp_config or {}), "mcpServers": _mcp_config()["mcpServers"], "user_id": owner_id}
     db.add(child)
     db.flush()
     db.add(AgentEvent(

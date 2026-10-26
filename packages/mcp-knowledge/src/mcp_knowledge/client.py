@@ -120,6 +120,17 @@ class KnowledgeClient:
     def orch_get_executor(self, orchestrator_id: str, executor_id: str) -> dict[str, Any]:
         return self._request("GET", f"/api/v0/orchestrations/{quote(orchestrator_id, safe='')}/executors/{quote(executor_id, safe='')}")
 
+    def permission_request(self, session_id: str, tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "POST", f"/api/v0/sessions/{quote(session_id, safe='')}/permission-requests",
+            json={"tool_name": tool_name, "input": tool_input},
+        )
+
+    def permission_status(self, session_id: str, approval_id: str) -> dict[str, Any]:
+        return self._request(
+            "GET", f"/api/v0/sessions/{quote(session_id, safe='')}/permission-requests/{quote(approval_id, safe='')}"
+        )
+
     def orch_set_plan(self, orchestrator_id: str, steps: list[dict]) -> dict[str, Any]:
         return self._request("POST", f"/api/v0/orchestrations/{quote(orchestrator_id, safe='')}/plan", json={"steps": steps})
 
