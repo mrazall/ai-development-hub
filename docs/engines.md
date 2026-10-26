@@ -1,7 +1,8 @@
 # Adding an engine
 
 An engine is an agent CLI the worker can drive. Built in: `claude_code` (Claude Code, stream-JSON),
-`codex` (Codex CLI, `exec --json`), `opencode`, and `mock*` engines for tests and demos.
+`codex` (Codex CLI, `exec --json`), and `mock*` engines for tests and demos. (`opencode` is detected on
+workers but has no adapter yet — a good first engine to add.)
 
 ## The adapter contract
 

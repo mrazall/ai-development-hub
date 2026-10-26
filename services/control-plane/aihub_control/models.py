@@ -172,6 +172,9 @@ class Session(Base):
     mcp_config: Mapped[dict | None] = mapped_column(JSON)
     # Set when a provider limit stopped the session: the hub continues it at this moment.
     resume_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Claude Code permissions: edits (file edits only), ask (the owner approves each other action in the panel),
+    # auto (Claude's auto mode: a classifier allows routine actions, blocks risky ones), all (bypassPermissions).
+    permission_mode: Mapped[str] = mapped_column(String(16), default="edits", server_default="edits", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 

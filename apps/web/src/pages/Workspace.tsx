@@ -427,6 +427,7 @@ function SessionWorkspace({
           ['completed', 'failed', 'offline'].includes(session.status)
         }
         onContinued={onContinued}
+        permissionMode={session.engine === 'claude_code' ? (session.permission_mode ?? 'edits') : undefined}
       />
       <ConfirmDialog
         open={Boolean(pendingAction)}
@@ -777,6 +778,7 @@ function NewSessionDialog({
     executor_count: '2',
     executor_account_profile_id: '',
     executor_model: 'gpt-5.6-luna',
+    permission_mode: 'edits',
   });
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachError, setAttachError] = useState('');
@@ -809,10 +811,12 @@ function NewSessionDialog({
   const info = useApi<{ demo: boolean }>('/system/info');
   const engineOptions = info.data?.demo ? MOCK_ENGINES : availableEngines.length ? availableEngines : [...engines];
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  // A subscription account runs only its own CLI: the engine list follows the chosen account.
+  // A subscription account runs only its own CLI: the engine list follows the chosen account. The built-in mock
+  // engines need no login and run with any account (the demo's profiles are Claude/Codex kinds).
   const allowedEngines = engineOptions.filter(
     (engine) =>
       !account ||
+      engine.startsWith('mock') ||
       (account.kind === 'claude_code_subscription'
         ? engine === 'claude_code'
         : account.kind === 'codex_subscription'
@@ -1061,6 +1065,27 @@ function NewSessionDialog({
                 <option key={engine}>{engine}</option>
               ))}
             </select>
+          </label>
+        )}
+        {form.mode === 'single' && form.engine === 'claude_code' && (
+          <label>
+            {t('Права агента')}
+            <select value={form.permission_mode} onChange={(event) => update('permission_mode', event.target.value)}>
+              <option value="edits">{t('Только правки файлов — команды запрещены')}</option>
+              <option value="ask">{t('Спрашивать — каждое действие подтверждаете вы')}</option>
+              <option value="auto">{t('Авто — Claude сам решает, опасное блокирует')}</option>
+              <option value="all">{t('Разрешить всё — без ограничений')}</option>
+            </select>
+            {form.permission_mode === 'all' && (
+              <small className="field-error">
+                {t('Агент выполнит любые команды без вопросов, с правами пользователя воркера.')}
+              </small>
+            )}
+            {form.permission_mode === 'ask' && (
+              <small className="muted">
+                {t('Запросы придут уведомлением и появятся в сессии: «Разрешить» или «Отклонить».')}
+              </small>
+            )}
           </label>
         )}
         <label>

@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Source of docs/assets/social-preview.png (1280×640, GitHub social preview). Render: see docs/assets/src/README.md -->
+<html lang="en"><head><meta charset="utf-8"><style>
+  :root { --bg:#141414; --surface:#1b1b1b; --border:#303030; --text:#f0f0ed; --muted:#b3b3af; --dim:#858580; --accent:#e6b85b; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1280px; height:640px; background:var(--bg); color:var(--text); overflow:hidden;
+         font-family:"Inter","Segoe UI","DejaVu Sans",system-ui,sans-serif; position:relative; }
+  .grid { position:absolute; inset:0; background-image:radial-gradient(#2a2a2a 1px, transparent 1px); background-size:28px 28px; opacity:.6; }
+  .left { position:absolute; left:72px; top:78px; width:560px; }
+  .brand { display:flex; align-items:center; gap:18px; }
+  .brand svg { width:76px; height:76px; }
+  .eyebrow { font-size:15px; letter-spacing:.22em; color:var(--dim); font-weight:600; }
+  h1 { margin-top:34px; font-size:64px; line-height:1.02; letter-spacing:-.025em; font-weight:800; }
+  p.tag { margin-top:22px; font-size:24px; line-height:1.4; color:var(--muted); }
+  ul { list-style:none; padding:0; margin-top:34px; display:grid; gap:12px; }
+  li { font-size:19px; color:var(--text); display:flex; gap:12px; align-items:center; }
+  li::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); flex:none; }
+  .foot { position:absolute; left:72px; bottom:46px; font-size:16px; color:var(--dim); letter-spacing:.02em; }
+  .shot { position:absolute; left:690px; top:70px; width:700px; height:500px; border:1px solid var(--border); border-radius:14px;
+          overflow:hidden; background:var(--surface); box-shadow:0 30px 80px rgba(0,0,0,.55); }
+  .shot img { width:1000px; position:absolute; left:-190px; top:-60px; }
+</style></head><body>
+<div class="grid"></div>
+<div class="left">
+  <div class="brand">
+    <svg viewBox="0 0 64 64"><g stroke="#A6A6A1" stroke-width="2.5" stroke-linecap="round"><line x1="17" y1="25" x2="43" y2="11"/><line x1="43" y1="11" x2="46" y2="39"/><line x1="17" y1="25" x2="24" y2="49"/><line x1="24" y1="49" x2="46" y2="39"/><line x1="17" y1="25" x2="46" y2="39"/></g><circle cx="43" cy="11" r="7" fill="#F0F0ED"/><circle cx="17" cy="25" r="7" fill="#F0F0ED"/><circle cx="24" cy="49" r="7" fill="#F0F0ED"/><circle cx="46" cy="39" r="9" fill="#E6B85B"/></svg>
+    <span class="eyebrow">SELF-HOSTED · OPEN SOURCE</span>
+  </div>
+  <h1>AI Development Hub</h1>
+  <p class="tag">One panel for Claude Code and Codex running on your own machines.</p>
+  <ul>
+    <li>Live agent sessions across your workers</li>
+    <li>Orchestrator + executors on git branches</li>
+    <li>Shared, reviewable memory in your Obsidian vault</li>
+  </ul>
+</div>
+<div class="foot">github.com/mrazall/ai-development-hub · Apache-2.0</div>
+<div class="shot"><img src="../workspace.png" alt=""></div>
+</body></html>

@@ -171,3 +171,8 @@
     transition: none;
   }
 }
+/* Agent permissions for a continuation, next to Send. */
+.chat-form .composer-permissions {
+  flex: none;
+  width: auto;
+}

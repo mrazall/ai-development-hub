@@ -24,6 +24,7 @@ def write_claude_session_config(
     command: str | None = None,
     token_file: str | os.PathLike[str] | None = None,
     orchestrator_session: str | None = None,
+    permission_session: str | None = None,
 ) -> Path:
     """Write the chat-only Hub MCP config with the capability in the child env.
 
@@ -52,6 +53,8 @@ def write_claude_session_config(
                     "AIHUB_MCP_TOOLSET": "lean",  # search/read/draft only — fewer tool descriptions per turn
                     # Registers the orch_* tools (spawn/list/get/wait/stop executors) in mcp-knowledge.
                     **({"AIHUB_ORCH_SESSION": orchestrator_session} if orchestrator_session else {}),
+                    # "Ask" sessions: registers the permission_request tool (--permission-prompt-tool).
+                    **({"AIHUB_PERMISSION_SESSION": permission_session} if permission_session else {}),
                 },
             }
         }

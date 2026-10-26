@@ -107,6 +107,7 @@ def claim(assignment_id: str, principal=Depends(worker_principal), db=Depends(db
         "chat_id": session.chat_id,
         # Orchestrator mode: the worker gives orchestrators the orch_* MCP tools and executors a git worktree.
         "role": session.role,
+        "permission_mode": session.permission_mode,
         "orchestration": session.orchestration,
         "parent_session_id": session.parent_session_id,
         "allowed_paths": project.allowed_paths if project else [],
@@ -121,6 +122,8 @@ def claim(assignment_id: str, principal=Depends(worker_principal), db=Depends(db
             scopes = {"knowledge:read", "knowledge:draft"}
             if session.role == "orchestrator":
                 scopes.add(f"orchestrate:{session.id}")
+            if session.permission_mode == "ask":
+                scopes.add(f"permit:{session.id}")
             token = issue_scoped_token(owner, scopes, settings=Settings())
             result["knowledge_token"] = token.access_token
             result["hub_token"] = token.access_token
@@ -148,6 +151,8 @@ def renew_assignment_token(assignment_id: str, principal=Depends(worker_principa
     scopes = {"knowledge:read", "knowledge:draft"}
     if session.role == "orchestrator":
         scopes.add(f"orchestrate:{session.id}")
+    if session.permission_mode == "ask":
+        scopes.add(f"permit:{session.id}")
     token = issue_scoped_token(owner, scopes, settings=Settings())
     return {"access_token": token.access_token, "token_type": "bearer", "expires_in": token.expires_in, "hub_url": get_setting(db, "public_url")}
 

@@ -97,6 +97,8 @@ jobs:
       - run: ./scripts/quickstart.sh --demo
       - name: The panel answers
         run: curl -fsS http://127.0.0.1:58080/api/v0/health
+      - name: A demo session runs to completion on the demo worker
+        run: python3 scripts/demo-smoke.py http://127.0.0.1:58080 .aihub/admin-password
       - if: always()
         run: ./scripts/quickstart.sh --down
 

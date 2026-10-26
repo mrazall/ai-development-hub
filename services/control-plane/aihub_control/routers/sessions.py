@@ -1,20 +1,26 @@
+import json
 from datetime import datetime, timezone
+
+import jwt
+from fastapi.security import HTTPAuthorizationCredentials
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from sqlalchemy import select
 
-from ..auth import current_principal, current_user, db_dep, write_user
+from ..auth import bearer, current_principal, current_user, db_dep, write_user
+from ..config import Settings
 from ..deps import project_or_404
 from sqlalchemy import delete, text
 
-from ..models import AccountProfile, AgentEvent, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
+from ..models import AccountProfile, AgentEvent, User, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
 from ..redaction import redact
-from ..schemas import ContinueIn, EventIn, EventOut, SessionIn, SessionOut, StatusIn
+from ..schemas import ContinueIn, EventIn, EventOut, PermissionRequestIn, SessionIn, SessionOut, StatusIn
 from ..deps import is_admin
 from ..state import validate_transition
 from ..orchestration.notifications import notify_users
-from ..approvals.service import create_from_event
+from ..approvals.service import create_from_event, expire_approval
 from ..orchestration.auto_resume import resume_session, schedule_if_limited
+from .chats import _mcp_config
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -26,7 +32,7 @@ ENGINE_OF_ACCOUNT = {"claude_code_subscription": "claude_code", "codex_subscript
 def _check_engine_matches_account(db, engine: str, account_profile_id: str | None) -> None:
     account = db.get(AccountProfile, account_profile_id) if account_profile_id else None
     expected = ENGINE_OF_ACCOUNT.get(account.kind) if account else None
-    if expected and engine != expected:
+    if expected and engine != expected and not engine.startswith("mock"):  # mock engines need no login
         raise HTTPException(422, f"аккаунт {account.id} работает только с движком {expected}, выбран {engine}")
 
 
@@ -35,6 +41,10 @@ def create_session(data: SessionIn, user=Depends(write_user), db=Depends(db_dep)
     project_or_404(db, user, data.project_id)
     _check_engine_matches_account(db, data.engine, data.account_profile_id)
     session = Session(**data.model_dump(exclude={"hold"}), **({"status": "draft"} if data.hold else {}))
+    if data.permission_mode == "ask" and data.engine == "claude_code" and not session.mcp_config:
+        # "Ask" goes through the hub MCP server (its permission tool); the worker exchanges the user id for a
+        # short-lived token scoped to this session's permission requests.
+        session.mcp_config = {"mcpServers": _mcp_config()["mcpServers"], "user_id": user.id}
     db.add(session)
     db.commit()
     db.refresh(session)
@@ -159,7 +169,8 @@ def retry_session(session_id: str, user=Depends(write_user), db=Depends(db_dep))
                    engine=original.engine, provider=original.provider, model=original.model,
                    auth_mode=original.auth_mode, workdir=original.workdir, branch=original.branch,
                    parent_session_id=original.id, account_profile_id=original.account_profile_id,
-                   workspace_ref=original.workspace_ref, title=original.title, status="queued")
+                   workspace_ref=original.workspace_ref, title=original.title, status="queued",
+                   permission_mode=original.permission_mode, mcp_config=original.mcp_config)
     db.add(copy); db.commit(); db.refresh(copy)
     return copy
 
@@ -180,7 +191,8 @@ def continue_session(
         raise HTTPException(409, "продолжение доступно только для завершённой или упавшей сессии")
     if not original.engine_session_ref:
         raise HTTPException(409, "у сессии нет ссылки на беседу агента — её нельзя продолжить")
-    resumed = resume_session(db, original, data.text, data.attachment_ids, model=data.model, fresh=data.fresh, effort=data.effort)
+    resumed = resume_session(db, original, data.text, data.attachment_ids, model=data.model, fresh=data.fresh,
+                             effort=data.effort, permission_mode=data.permission_mode, user=user)
     db.commit()
     db.refresh(resumed)
     return resumed
@@ -268,3 +280,53 @@ def post_events(
         out.append(event)
     db.commit()
     return out
+
+
+# --- Permission requests: Claude Code in "ask" mode asks the owner through the hub MCP permission tool ---
+
+def _permit_scope(session_id: str, credentials: HTTPAuthorizationCredentials = Depends(bearer), db=Depends(db_dep)) -> User:
+    """The token must carry `permit:<this session id>` (issued to the worker for an "ask" session)."""
+    if not credentials:
+        raise HTTPException(401, "authentication required")
+    try:
+        data = jwt.decode(credentials.credentials, Settings().secret_key, algorithms=["HS256"])
+    except (jwt.DecodeError, jwt.ExpiredSignatureError, KeyError):
+        raise HTTPException(401, "invalid token")
+    if f"permit:{session_id}" not in set(str(data.get("scope", "")).split()):
+        raise HTTPException(403, "permission scope missing")
+    user = db.get(User, data.get("sub"))
+    if not user:
+        raise HTTPException(401, "invalid token")
+    return user
+
+
+@router.post("/{session_id}/permission-requests", status_code=201)
+def request_permission(session_id: str, data: PermissionRequestIn, _user=Depends(_permit_scope), db=Depends(db_dep)):
+    session = db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "session not found")
+    details = json.dumps(data.input, ensure_ascii=False, default=str)
+    approval = create_from_event(db, session, {
+        "action": data.tool_name,
+        "summary": redact(details if len(details) <= 2000 else details[:2000] + "…")[0],
+        "risk": "high" if data.tool_name in {"Bash", "WebFetch"} or data.tool_name.startswith("mcp__") else "medium",
+    })
+    if approval is None:
+        raise HTTPException(422, "invalid permission request")
+    db.flush()
+    # The session feed shows it as a card with Allow / Reject.
+    db.add(AgentEvent(session_id=session.id, kind="approval.request", source="native", payload={
+        "approval_id": approval.id, "action": approval.action, "summary": approval.summary, "risk": approval.risk,
+    }))
+    db.commit()
+    return {"id": approval.id, "status": approval.status}
+
+
+@router.get("/{session_id}/permission-requests/{approval_id}")
+def permission_status(session_id: str, approval_id: str, _user=Depends(_permit_scope), db=Depends(db_dep)):
+    approval = db.get(Approval, approval_id)
+    if not approval or approval.session_id != session_id:
+        raise HTTPException(404, "permission request not found")
+    if expire_approval(approval, datetime.now(timezone.utc)):
+        db.commit()
+    return {"id": approval.id, "status": approval.status}

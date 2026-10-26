@@ -412,8 +412,17 @@ class ClaudeCodeAdapter(_JsonLinesAdapter):
         extra_env: dict[str, str] | None = None,
         add_dirs: list[str] | None = None,
         effort: str | None = None,
+        permission_mode: str = "edits",
+        lean_tools: bool = True,
     ):
-        command = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", "acceptEdits"]
+        # edits: file edits pre-approved, anything else silently denied (nobody can answer a prompt in -p mode);
+        # ask: every other action goes to the owner through the hub MCP permission tool;
+        # auto: Claude's auto mode (a classifier allows routine actions and blocks risky ones);
+        # all: everything allowed (the owner chose it for this session).
+        mode = {"auto": "auto", "all": "bypassPermissions"}.get(permission_mode, "acceptEdits")
+        command = ["claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--permission-mode", mode]
+        if permission_mode == "ask" and mcp_config:
+            command += ["--permission-prompt-tool", "mcp__knowledge__permission_request"]
         # Owner's choice: Opus at low effort (fewer thinking tokens → slower drain of the subscription limits).
         # A chat may choose its own effort; otherwise the worker default.
         command += ["--effort", effort or os.environ.get("AIHUB_CLAUDE_EFFORT", "low")]
@@ -428,8 +437,9 @@ class ClaudeCodeAdapter(_JsonLinesAdapter):
         if mcp_config:
             # Chat sessions: a lean built-in tool set and only our MCP servers. Measured 24.10 on
             # Claude Code 2.1.308: ~19.5k → ~8.5k context tokens per turn.
-            command += ["--mcp-config", str(mcp_config), "--strict-mcp-config", "--disable-slash-commands"]
-            command += ["--tools", CHAT_TOOLS]
+            command += ["--mcp-config", str(mcp_config), "--strict-mcp-config"]
+            if lean_tools:  # not for a workspace session that has the MCP server only to ask for permissions
+                command += ["--disable-slash-commands", "--tools", CHAT_TOOLS]
         if append_system_prompt:
             command += ["--append-system-prompt", append_system_prompt]
         if allowed_tools:

@@ -23,3 +23,5 @@ def test_codex_with_a_claude_account_is_refused(client, admin_token):  # noqa: F
     refused = _session(client, admin_token, "codex", "claude-a")
     assert refused.status_code == 422 and "claude_code" in refused.text
     assert _session(client, admin_token, "claude_code", "claude-a").status_code == 200
+    # The demo's built-in mock engines need no login and run with any profile.
+    assert _session(client, admin_token, "mock_write", "claude-a").status_code == 200

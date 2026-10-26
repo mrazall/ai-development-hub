@@ -389,6 +389,7 @@ class Worker:
                         str(session.get("knowledge_token") or ""),
                         token_file=session_token_file,
                         orchestrator_session=session["id"] if session.get("role") == "orchestrator" else None,
+                        permission_session=session["id"] if session.get("permission_mode") == "ask" else None,
                     )
             except (OSError, RuntimeError, ValueError, httpx.HTTPError) as exc:
                 warning = re.sub(r"\$\{[^}]+\}", "${REDACTED}", str(exc))
@@ -438,6 +439,8 @@ class Worker:
                     mcp_config=session_mcp_path,
                     append_system_prompt=(session.get("mcp_config") or {}).get("append_system_prompt"),
                     effort=(session.get("mcp_config") or {}).get("effort"),
+                    permission_mode=session.get("permission_mode") or "edits",
+                    lean_tools=bool(session.get("chat_id") or session.get("role") in {"orchestrator", "vault"}),
                     # Orchestrators review and merge executor branches (git) and run tests; non-interactive
                     # Claude needs these pre-approved. Chats keep only the memory tools pre-approved.
                     allowed_tools=(

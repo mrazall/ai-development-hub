@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Literal, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .models import SessionStatus
 
@@ -92,6 +92,12 @@ class WorkerOut(WorkerIn):
     worker_token: str | None = None
 
 
+class PermissionRequestIn(BaseModel):
+    """Claude Code's permission prompt for one tool call (from the hub MCP permission tool)."""
+    tool_name: str = Field(min_length=1, max_length=255)
+    input: dict[str, Any] = {}
+
+
 class SessionIn(BaseModel):
     task_id: str | None = None
     # hold: created as a draft (not claimable) until POST /sessions/{id}/start — files are uploaded first.
@@ -109,6 +115,7 @@ class SessionIn(BaseModel):
     workspace_ref: str | None = None
     title: str | None = None
     context_fresh: bool = False
+    permission_mode: Literal["edits", "ask", "auto", "all"] = "edits"
 
 
 class SessionOut(SessionIn):
@@ -123,6 +130,7 @@ class SessionOut(SessionIn):
     role: str | None = None
     orchestration: dict | None = None
     resume_at: datetime | None = None
+    permission_mode: str = "edits"
 
 
 # --- Orchestration ---
@@ -199,6 +207,8 @@ class ContinueIn(BaseModel):
     model: str | None = Field(default=None, max_length=128)
     # Claude Code --effort; None keeps what the session used before.
     effort: str | None = Field(default=None, pattern=r"^(low|medium|high|xhigh|max)$")
+    # Claude Code permissions for the continuation; None keeps the session's mode.
+    permission_mode: Literal["edits", "ask", "auto", "all"] | None = None
 
 
 # --- Chats ---

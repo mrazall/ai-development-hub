@@ -822,4 +822,17 @@ export const en: Record<string, string> = {
     'What should the agent do? You can paste files here (Ctrl+V)',
   'Прикрепить файлы': 'Attach files',
   'Выбрать файлы': 'Choose files',
+  'Права агента': 'Agent permissions',
+  'Только правки файлов — команды запрещены': 'File edits only — commands denied',
+  'Спрашивать — каждое действие подтверждаете вы': 'Ask — you approve each action',
+  'Авто — Claude сам решает, опасное блокирует': 'Auto — Claude decides, blocks risky actions',
+  'Разрешить всё — без ограничений': 'Allow everything — no limits',
+  'Агент выполнит любые команды без вопросов, с правами пользователя воркера.':
+    "The agent runs any command without asking, with the worker user's rights.",
+  'Запросы придут уведомлением и появятся в сессии: «Разрешить» или «Отклонить».':
+    'Requests arrive as notifications and appear in the session: Allow or Reject.',
+  'Права агента для продолжения': 'Agent permissions for the continuation',
+  'Только правки': 'Edits only',
+  Спрашивать: 'Ask',
+  'Разрешить всё': 'Allow everything',
 };
