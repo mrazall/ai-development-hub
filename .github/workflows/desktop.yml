@@ -22,9 +22,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
 
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
-          toolchain: 1.89.0
+          toolchain: 1.95.0
           targets: x86_64-pc-windows-msvc
 
       - name: Build worker bundle
