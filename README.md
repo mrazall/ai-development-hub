@@ -15,6 +15,12 @@
   <a href="https://github.com/mrazall/ai-development-hub/actions/workflows/ci.yml"><img src="https://github.com/mrazall/ai-development-hub/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
+  <a href="https://github.com/mrazall/ai-development-hub/releases/latest"><img src="https://img.shields.io/github/v/release/mrazall/ai-development-hub?include_prereleases&label=release" alt="Latest release"></a>
+</p>
+
+<p align="center">
+  <b>New in 0.2.0-alpha:</b> a Windows desktop app, any number of Claude/Codex accounts with hand-over between
+  them, and a sign-in that stays. <a href="https://github.com/mrazall/ai-development-hub/releases/tag/v0.2.0-alpha">Release notes</a>
 </p>
 
 ![The demo: a session, a chat with memory and the knowledge graph (mock engines)](docs/assets/demo.gif)
@@ -52,7 +58,11 @@ commands), *ask* (every other action becomes an approval in the panel — Allow 
 when you continue a session.
 
 **Let long jobs survive limits.** When a subscription limit stops a session, the hub schedules it to resume the
-moment the limit resets, in the same CLI conversation.
+moment the limit resets, in the same CLI conversation — or you continue it right away on another account.
+
+**Use every subscription you have.** Add as many Claude Code and Codex accounts as you like; the hub gives each
+its own profile folder on the worker (logins stay separate, history and settings are shared), shows who is
+signed in where, and detects a login that already exists on the machine.
 
 **Split a task between agents.** In orchestrated mode a Claude orchestrator publishes a plan, starts up to four
 Codex executors, each in its own git worktree and branch, reviews their work and merges it. You see the plan,
@@ -68,7 +78,11 @@ into one folder; you review a draft, and one click lets a model merge it into th
 per message.
 
 **Know when something breaks.** A System health page checks workers, Tailscale, account limits, the index,
-backups and recent failures, and sends a notification when a check fails or recovers.
+backups and recent failures, and sends a notification when a check fails or recovers. A failed session you have
+looked at can be marked *all good* so it stops showing as a problem.
+
+**Stay signed in.** The panel keeps you signed in until you sign out or don't use it for 30 days (rotating device
+tokens in an httpOnly cookie) — on every device separately.
 
 ## Why self-hosted
 
@@ -102,16 +116,32 @@ Stop it with `./scripts/quickstart.sh --down` (data volumes are kept); `--reset`
 1. Start the hub without the demo: `./scripts/quickstart.sh`, or deploy it on a server —
    [docs/deployment.md](docs/deployment.md).
 2. On each machine with Claude Code and/or Codex (Linux or WSL2), run a worker — [docs/workers.md](docs/workers.md).
-3. **Settings → Accounts**: add a profile per subscription and log the CLI in once under that profile.
+3. **Settings → Accounts**: add a profile per subscription (or adopt a login the worker already has) and log
+   the CLI in once under that profile — the panel gives you the exact command.
 4. Point the knowledge service at your vault (`AIHUB_VAULT_HOST_DIR`) — [docs/configuration.md](docs/configuration.md).
 
 ## Windows desktop app
 
-Windows users can install the Tauri desktop client, which opens the hub in its own window, runs the worker in WSL2,
-adds a tray indicator and can start with Windows. It requires Windows 10/11, WSL2 with Ubuntu and systemd, Python
-3.12+, and the agent CLIs you want to use. The installer is currently unsigned, so read the SmartScreen guidance and
-the clean-machine checklist in [docs/desktop.md](docs/desktop.md) before installing. The Windows build workflow is
-manual-only and uploads an artifact; it does not publish releases.
+A small Tauri app for Windows 10/11 that turns a PC into a worker without touching a terminal:
+
+- **Setup wizard** — checks WSL2 (Ubuntu with systemd), installs the worker there or adopts one you already run,
+  registers the machine with your hub and offers to log in the agent CLIs.
+- **Tray** — the Nodes mark animates while agents are working; double click opens the panel full screen.
+- **Settings inside the panel** — in the app, the panel's *Settings* page gets a *Windows app* block: worker
+  state, updates, start with Windows, restart worker, worker log.
+- **Updates from your own hub** — releases are signed with your key and served by the hub at
+  `/desktop/latest.json`; the app checks daily and installs on your confirmation.
+
+Download the installer from the [latest release](https://github.com/mrazall/ai-development-hub/releases/latest).
+It is not code-signed yet, so Windows SmartScreen will warn: *More info → Run anyway*. The released installer has
+self-updates **off** — they need *your* key. To turn them on, generate one
+(`npx @tauri-apps/cli signer generate -w <file outside the repo>`), put the public key into
+`plugins.updater.pubkey` in `apps/desktop/src-tauri/tauri.conf.json`, set `bundle.createUpdaterArtifacts` to
+`true`, build the installer with `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` set, and
+copy the installer, its `.sig` and a `latest.json` into the hub's data volume under `desktop/`.
+
+The installer is also built by GitHub Actions for every release tag (`.github/workflows/desktop.yml`), and can be
+run by hand from the Actions tab.
 
 ## How it works
 
