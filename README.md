@@ -15,7 +15,7 @@
   <a href="https://github.com/mrazall/ai-development-hub/actions/workflows/ci.yml"><img src="https://github.com/mrazall/ai-development-hub/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
-  <a href="https://github.com/mrazall/ai-development-hub/releases/latest"><img src="https://img.shields.io/github/v/release/mrazall/ai-development-hub?include_prereleases&label=release" alt="Latest release"></a>
+  <a href="https://github.com/mrazall/ai-development-hub/releases"><img src="https://img.shields.io/github/v/release/mrazall/ai-development-hub?include_prereleases&label=release" alt="Latest release"></a>
 </p>
 
 <p align="center">
@@ -132,7 +132,7 @@ A small Tauri app for Windows 10/11 that turns a PC into a worker without touchi
 - **Updates from your own hub** — releases are signed with your key and served by the hub at
   `/desktop/latest.json`; the app checks daily and installs on your confirmation.
 
-Download the installer from the [latest release](https://github.com/mrazall/ai-development-hub/releases/latest).
+Download the installer from the [latest release](https://github.com/mrazall/ai-development-hub/releases).
 It is not code-signed yet, so Windows SmartScreen will warn: *More info → Run anyway*. The released installer has
 self-updates **off** — they need *your* key. To turn them on, generate one
 (`npx @tauri-apps/cli signer generate -w <file outside the repo>`), put the public key into
