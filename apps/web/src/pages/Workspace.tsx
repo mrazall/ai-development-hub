@@ -1,3 +1,4 @@
+import { AcknowledgeButton } from '../components/AcknowledgeButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
@@ -14,11 +15,21 @@ import type {
   Task,
   Worker,
   WorkerDetails,
+  AlternativeAccount,
 } from '../api/types';
 import type { Attachment } from '../api/types-ops';
-import { ago, useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { DeleteSessionButton } from '../components/DeleteSessionButton';
-import { ConfirmDialog, Dialog, ErrorBanner, Loading, SplitPane, StatusBadge, StatusIcon } from '../components/ui';
+import {
+  ConfirmDialog,
+  Dialog,
+  ErrorBanner,
+  Loading,
+  SplitPane,
+  StatusBadge,
+  StatusIcon,
+  sessionStatus,
+} from '../components/ui';
 import { Icon } from '../components/ui/icons';
 import { ChatComposer } from '../components/ChatComposer';
 import { SessionTerminal } from '../components/Terminal';
@@ -26,7 +37,8 @@ import { MarkdownView } from '../components/MarkdownView';
 import { CopyButton, QuoteSelection } from '../components/copy';
 import { AttachmentChips, useSessionAttachments } from '../components/attachments';
 import { ProjectList, useProjectStatus } from '../components/ProjectPicker';
-import { chatEvents, isPartial, useSessionEvents } from '../api/sessionFeed';
+import { chatEvents, isPartial, isUserMessage, SessionThreads, useSessionEvents } from '../api/sessionFeed';
+import { Thinking, TimeAgo } from '../components/time';
 import { t } from '../i18n';
 
 const engines = ['claude_code', 'codex', 'opencode'] as const;
@@ -39,6 +51,7 @@ export function Workspace(): JSX.Element {
   const projectId = params.get('project') ?? '';
   const sessionId = params.get('session') ?? '';
   const projects = useApi<Project[]>('/projects');
+  const projectList = arrayOrEmpty(projects.data);
   const sessions = useApi<Session[]>(projectId ? `/sessions?project_id=${encodeURIComponent(projectId)}` : null, {
     refreshMs: 10_000,
   });
@@ -48,18 +61,45 @@ export function Workspace(): JSX.Element {
   });
   const [showDialog, setShowDialog] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('sessions');
+  // A continuation (or a retry) carries on its parent's work: the chain is one session in the list and
+  // one conversation in the feeds. Orchestrators' executors are not continuations.
+  const threads = useMemo(() => {
+    const list = arrayOrEmpty(sessions.data);
+    const byId = new Map(list.map((item) => [item.id, item]));
+    const next = new Map<string, Session>();
+    list.forEach((item) => {
+      const parent = item.parent_session_id ? byId.get(item.parent_session_id) : undefined;
+      if (!parent || item.role === 'executor' || parent.role === 'orchestrator') return;
+      const known = next.get(parent.id);
+      if (!known || known.created_at < item.created_at) next.set(parent.id, item);
+    });
+    const headOf = new Map<string, string>();
+    const chains = new Map<string, string[]>();
+    list.forEach((item) => {
+      if (next.has(item.id)) return; // not the newest of its chain
+      const chain = [item.id];
+      for (let cur = item; cur.parent_session_id && next.get(cur.parent_session_id)?.id === cur.id; ) {
+        cur = byId.get(cur.parent_session_id)!;
+        chain.unshift(cur.id);
+      }
+      chain.forEach((id) => headOf.set(id, item.id));
+      chains.set(item.id, chain);
+    });
+    return { headOf, chains, superseded: new Set(next.keys()) };
+  }, [sessions.data]);
+  const headId = threads.headOf.get(sessionId) ?? sessionId;
   // Without an explicit choice open the newest top-level session, not an executor folded under it.
   const selectedFromList =
-    sessions.data?.find((item) => item.id === sessionId) ??
-    sessions.data?.find((item) => item.role !== 'executor') ??
-    sessions.data?.[0];
+    arrayOrEmpty(sessions.data).find((item) => item.id === headId) ??
+    arrayOrEmpty(sessions.data).find((item) => item.role !== 'executor') ??
+    arrayOrEmpty(sessions.data)[0];
   const live = useEventStream({ sessionId: selectedFromList?.id, limit: 100 });
   const selected = useLiveSession(selectedFromList, live);
   const worker = useApi<WorkerDetails>(selected ? `/workers/${encodeURIComponent(selected.worker_id)}` : null);
 
   useEffect(() => {
-    if (!projectId && projects.data?.[0]) setParams({ project: projects.data[0].id });
-  }, [projectId, projects.data, setParams]);
+    if (!projectId && projectList[0]) setParams({ project: projectList[0].id });
+  }, [projectId, projectList, setParams]);
   useEffect(() => {
     if (selected && selected.id !== sessionId) setParams({ project: projectId, session: selected.id });
   }, [projectId, selected, sessionId, setParams]);
@@ -68,11 +108,12 @@ export function Workspace(): JSX.Element {
   // Executors an orchestrator started sit folded under it; the arrow unfolds them.
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const sessionTree = useMemo(() => {
-    const list = sessions.data ?? [];
+    const list = arrayOrEmpty(sessions.data);
     const ids = new Set(list.map((item) => item.id));
     const children = new Map<string, Session[]>();
     const roots: Session[] = [];
     list.forEach((item) => {
+      if (threads.superseded.has(item.id)) return; // shown as its newest continuation
       if (item.role === 'executor' && item.parent_session_id && ids.has(item.parent_session_id)) {
         children.set(item.parent_session_id, [...(children.get(item.parent_session_id) ?? []), item]);
       } else {
@@ -80,7 +121,7 @@ export function Workspace(): JSX.Element {
       }
     });
     return { roots, children };
-  }, [sessions.data]);
+  }, [sessions.data, threads]);
   const toggleGroup = (id: string) =>
     setOpenGroups((current) => {
       const next = new Set(current);
@@ -124,10 +165,12 @@ export function Workspace(): JSX.Element {
       <span>
         <strong>{item.title || item.engine}</strong>
         <small>
-          {item.model} · {ago(item.updated_at)}
+          {item.model} · <TimeAgo value={item.updated_at} />
+          {(threads.chains.get(item.id)?.length ?? 1) > 1 &&
+            t(' · продолжений: {0}', (threads.chains.get(item.id)?.length ?? 1) - 1)}
         </small>
       </span>
-      <StatusIcon value={item.id === selected?.id ? selected.status : item.status} />
+      <StatusIcon value={sessionStatus(item.id === selected?.id ? selected : item)} />
       <DeleteSessionButton
         session={item.id === selected?.id ? selected : item}
         onDeleted={() => {
@@ -178,12 +221,7 @@ export function Workspace(): JSX.Element {
         collapsedLabel={t('Проекты и сессии')}
       >
         <aside className="panel workspace-sidebar">
-          <ProjectList
-            projects={projects.data ?? []}
-            status={projectStatus}
-            selected={projectId}
-            onSelect={chooseProject}
-          />
+          <ProjectList projects={projectList} status={projectStatus} selected={projectId} onSelect={chooseProject} />
           <div className="sidebar-section">
             <div className="panel-heading">
               <h2>{t('Задачи')}</h2>
@@ -192,18 +230,20 @@ export function Workspace(): JSX.Element {
             {tasks.loading ? (
               <Loading />
             ) : (
-              (tasks.data ?? []).slice(0, 5).map((task) => (
-                <div className="workspace-task" key={task.id}>
-                  <span>{task.title}</span>
-                  <StatusIcon value={task.status} />
-                </div>
-              ))
+              arrayOrEmpty(tasks.data)
+                .slice(0, 5)
+                .map((task) => (
+                  <div className="workspace-task" key={task.id}>
+                    <span>{task.title}</span>
+                    <StatusIcon value={task.status} />
+                  </div>
+                ))
             )}
           </div>
           <div className="sidebar-section">
             <div className="panel-heading">
               <h2>{t('Сессии')}</h2>
-              <span className="muted">{sessions.data?.length ?? 0}</span>
+              <span className="muted">{arrayOrEmpty(sessions.data).length}</span>
             </div>
             {sessions.error && <ErrorBanner message={sessions.error} />}
             {sessionTree.roots.map((item) => {
@@ -216,20 +256,22 @@ export function Workspace(): JSX.Element {
                 </div>
               );
             })}
-            {projectId && !sessions.data?.length && <p className="muted">{t('Сессий пока нет.')}</p>}
+            {projectId && !arrayOrEmpty(sessions.data).length && <p className="muted">{t('Сессий пока нет.')}</p>}
           </div>
         </aside>
         <main className="workspace-center">
           {selected ? (
-            <SessionWorkspace
-              session={selected}
-              worker={worker.data}
-              mobileTab={mobileTab}
-              onContinued={(id) => {
-                sessions.reload();
-                setParams({ project: projectId, session: id });
-              }}
-            />
+            <SessionThreads.Provider value={threads.chains}>
+              <SessionWorkspace
+                session={selected}
+                worker={worker.data}
+                mobileTab={mobileTab}
+                onContinued={(id) => {
+                  sessions.reload();
+                  setParams({ project: projectId, session: id });
+                }}
+              />
+            </SessionThreads.Provider>
           ) : (
             <div className="panel empty-workspace">
               <h2>{t('Выберите сессию слева')}</h2>
@@ -241,7 +283,7 @@ export function Workspace(): JSX.Element {
       </SplitPane>
       {showDialog && (
         <NewSessionDialog
-          projects={projects.data ?? []}
+          projects={projectList}
           projectId={projectId}
           onClose={() => setShowDialog(false)}
           onCreated={(session) => {
@@ -286,6 +328,8 @@ function SessionWorkspace({
   const [busy, setBusy] = useState<'stop' | 'retry' | ''>('');
   const [pendingAction, setPendingAction] = useState<'stop' | 'retry' | ''>('');
   const [error, setError] = useState('');
+  const [alternatives, setAlternatives] = useState<AlternativeAccount[] | null>(null);
+  const [switchBusy, setSwitchBusy] = useState('');
   const iframeUrl =
     session.workspace_ref && worker?.workspace_url
       ? `${worker.workspace_url.replace(/\/$/, '')}/sessions/${encodeURIComponent(session.workspace_ref)}`
@@ -325,7 +369,7 @@ function SessionWorkspace({
           )}
         </div>
         <div className="session-actions">
-          <StatusBadge value={session.status} />
+          <StatusBadge value={sessionStatus(session)} />
           <Link className="button-secondary" to={`/sessions/${session.id}/files`}>
             {t('Файлы и diff')}
           </Link>
@@ -348,8 +392,22 @@ function SessionWorkspace({
               <button className="button-secondary" onClick={() => void postAction('stop')} disabled={!!busy}>
                 {t('Не продолжать')}
               </button>
+              <button
+                className="button-secondary"
+                onClick={async () => {
+                  try {
+                    setAlternatives(await api<AlternativeAccount[]>(`/sessions/${session.id}/alternative-accounts`));
+                  } catch (cause) {
+                    setError(cause instanceof Error ? cause.message : t('Не удалось загрузить аккаунты'));
+                  }
+                }}
+                disabled={!!busy}
+              >
+                {t('Продолжить сейчас на другом аккаунте')}
+              </button>
             </>
           )}
+          {['failed', 'offline', 'blocked'].includes(session.status) && <AcknowledgeButton session={session} />}
           {(session.status === 'failed' || session.status === 'completed') && (
             <button className="button-secondary" onClick={() => void postAction('retry')} disabled={!!busy}>
               {busy === 'retry' ? t('Повтор…') : t('Повторить')}
@@ -363,17 +421,40 @@ function SessionWorkspace({
         </div>
       </div>
       {error && <ErrorBanner message={error} />}
+      {alternatives && (
+        <AlternativeAccounts
+          items={alternatives}
+          busy={switchBusy}
+          onClose={() => setAlternatives(null)}
+          onChoose={async (item) => {
+            setSwitchBusy(item.account.id);
+            setError('');
+            try {
+              await api(`/sessions/${session.id}/continue-on-account`, {
+                method: 'POST',
+                body: JSON.stringify({ account_profile_id: item.account.id }),
+              });
+              setAlternatives(null);
+              onContinued(session.id);
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : t('Не удалось продолжить на другом аккаунте'));
+            } finally {
+              setSwitchBusy('');
+            }
+          }}
+        />
+      )}
       {worker && (
         <div className="worker-status-card" aria-label={t('Состояние worker')}>
           <StatusBadge value={worker.status} />
           <span>
-            <strong>{worker.id}</strong> {t('· последний сигнал')} {ago(worker.last_heartbeat_at)}
+            <strong>{worker.id}</strong> {t('· последний сигнал')} <TimeAgo value={worker.last_heartbeat_at} />
           </span>
           <span className="muted">{t('источник: heartbeat')}</span>
         </div>
       )}
       <div className="session-status-line" aria-label={t('Статус сессии')}>
-        <StatusBadge value={session.status} />
+        <StatusBadge value={sessionStatus(session)} />
         <span>
           {t('Длительность:')} {durationLabel(session)}
         </span>
@@ -391,7 +472,7 @@ function SessionWorkspace({
         <SessionTerminal
           sessionId={session.id}
           extraTabs={[
-            { id: 'chat', label: t('Чат'), content: <ChatFeed sessionId={session.id} /> },
+            { id: 'chat', label: t('Чат'), content: <ChatFeed sessionId={session.id} status={session.status} /> },
             { id: 'events', label: t('События'), content: <SessionEvents sessionId={session.id} /> },
             // Orchestration links: the executors an orchestrator runs, or the parent of an executor.
             ...(session.role
@@ -446,6 +527,48 @@ function SessionWorkspace({
   );
 }
 
+function AlternativeAccounts({
+  items,
+  busy,
+  onClose,
+  onChoose,
+}: {
+  items: AlternativeAccount[];
+  busy: string;
+  onClose: () => void;
+  onChoose: (item: AlternativeAccount) => Promise<void>;
+}): JSX.Element {
+  return (
+    <Dialog open title={t('Продолжить на другом аккаунте')} onClose={onClose}>
+      <div className="modal-body create-form">
+        <p className="muted">{t('Доступны аккаунты этого движка на том же worker.')}</p>
+        {!items.length && <p>{t('Подходящих аккаунтов нет.')}</p>}
+        {items.map((item) => (
+          <article className="panel alternative-account" key={item.account.id}>
+            <strong>{item.account.name}</strong> <StatusBadge value={item.account.status} />
+            {item.limits && (
+              <UsageLine
+                usage={{ input_tokens: 0, cached_input_tokens: 0, output_tokens: 0, cost_usd: null }}
+                account={item.limits}
+              />
+            )}
+            {item.resume_mode === 'summary' && (
+              <p className="notice">{t('Беседа начнётся заново с краткой сводкой')}</p>
+            )}
+            <button onClick={() => void onChoose(item)} disabled={!!busy}>
+              {busy === item.account.id
+                ? t('Продолжение…')
+                : item.resume_mode === 'summary'
+                  ? t('Продолжить — беседа начнётся заново с краткой сводкой')
+                  : t('Продолжить на этом аккаунте')}
+            </button>
+          </article>
+        ))}
+      </div>
+    </Dialog>
+  );
+}
+
 function eventText(event: SessionEvent): string {
   if (typeof event.payload.text === 'string') return event.payload.text;
   if (typeof event.payload.output === 'string') return event.payload.output;
@@ -461,7 +584,7 @@ function durationLabel(session: Session): string {
   return minutes ? t('{0} мин {1} с', minutes, seconds % 60) : t('{0} с', seconds);
 }
 
-function ChatFeed({ sessionId }: { sessionId: string }): JSX.Element {
+function ChatFeed({ sessionId, status }: { sessionId: string; status?: string }): JSX.Element {
   const all = useSessionEvents(sessionId, 200, 'chat');
   const attachments = useSessionAttachments(sessionId);
   // The chat is the conversation: commands and their output live in the Agent and Events tabs.
@@ -490,9 +613,26 @@ function ChatFeed({ sessionId }: { sessionId: string }): JSX.Element {
       ) : (
         <p className="muted">{t('Сообщений пока нет.')}</p>
       )}
+      {status && WORKING[status] && <Thinking label={WORKING[status]} since={turnStart(all, status)} />}
       <QuoteSelection container={feedRef} />
     </div>
   );
+}
+
+// The «working» line under the conversation while the session runs (Claude Code's «✻ Thinking… 12s»).
+const WORKING: Record<string, string> = {
+  queued: t('в очереди'),
+  starting: t('запускается'),
+  running: t('работает'),
+  waiting_approval: t('ждёт вашего решения'),
+};
+function turnStart(events: SessionEvent[], status: string): string | undefined {
+  // The turn starts with the last message of the user, or (a first run) when the session reached this status.
+  const asked = [...events].reverse().find((event) => isUserMessage(event));
+  const reached = [...events]
+    .reverse()
+    .find((event) => event.kind === 'session.status' && event.payload.status === status);
+  return asked?.ts ?? reached?.ts;
 }
 
 function eventIdentity(event: SessionEvent): string | null {
@@ -713,7 +853,17 @@ function SessionEvents({ sessionId }: { sessionId: string }): JSX.Element {
                 <small>#{event.cursor}</small>
                 <time>{new Date(event.ts).toLocaleTimeString()}</time>
               </div>
-              <pre>{JSON.stringify(event.payload, null, 2)}</pre>
+              {event.kind === 'session.account_switched' ? (
+                <p>
+                  {t(
+                    'Сессия продолжена на аккаунте {0}; беседа {1}.',
+                    String(event.payload.to ?? ''),
+                    event.payload.resume_mode === 'summary' ? t('началась заново с краткой сводкой') : t('продолжена'),
+                  )}
+                </p>
+              ) : (
+                <pre>{JSON.stringify(event.payload, null, 2)}</pre>
+              )}
               {typeof event.payload.path === 'string' && (
                 <Link
                   to={`/sessions/${sessionId}/files?path=${encodeURIComponent(event.payload.path)}${event.payload.line ? `#L${event.payload.line}` : ''}`}
@@ -736,7 +886,7 @@ function SessionTree({ session }: { session: Session }): JSX.Element {
     <div className="session-tree">
       <h2>{t('Граф агента')}</h2>
       <div className="tree-node">
-        <StatusBadge value={session.status} />
+        <StatusBadge value={sessionStatus(session)} />
         <span>{session.title || session.id}</span>
       </div>
       {session.parent_session_id ? (
@@ -764,6 +914,8 @@ function NewSessionDialog({
 }): JSX.Element {
   const workers = useApi<Worker[]>('/workers');
   const accounts = useApi<AccountProfile[]>('/accounts');
+  const workerList = arrayOrEmpty(workers.data);
+  const accountList = arrayOrEmpty(accounts.data);
   const accountNotFound = accounts.error.includes('(404)');
   const [form, setForm] = useState({
     project_id: projectId,
@@ -797,9 +949,9 @@ function NewSessionDialog({
   };
   const [manualMerge, setManualMerge] = useState(false);
   const [error, setError] = useState('');
-  const account = accounts.data?.find((item) => item.id === form.account_profile_id);
-  const orchestratorAccounts = (accounts.data ?? []).filter((item) => item.kind === 'claude_code_subscription');
-  const executorAccounts = (accounts.data ?? []).filter((item) => item.kind === 'codex_subscription');
+  const account = accountList.find((item) => item.id === form.account_profile_id);
+  const orchestratorAccounts = accountList.filter((item) => item.kind === 'claude_code_subscription');
+  const executorAccounts = accountList.filter((item) => item.kind === 'codex_subscription');
   const selectedProject = projects.find((item) => item.id === form.project_id);
   const models = account?.models ?? [];
   const selectedWorker = useApi<WorkerDetails>(
@@ -829,17 +981,17 @@ function NewSessionDialog({
     if (!allowedEngines.includes(form.engine)) update('engine', allowedEngines[0] ?? engineOptions[0] ?? 'codex');
   }, [allowedEngines.join(','), form.engine]);
   useEffect(() => {
-    if (!form.worker_id && workers.data) {
-      const online = workers.data.find((worker) => worker.status === 'online');
+    if (!form.worker_id && workerList.length) {
+      const online = workerList.find((worker) => worker.status === 'online');
       if (online) update('worker_id', online.id);
     }
-  }, [form.worker_id, workers.data]);
+  }, [form.worker_id, workerList]);
   useEffect(() => {
-    if (!form.account_profile_id && accounts.data) {
-      const matching = accounts.data.find((item) => item.worker_id === form.worker_id && item.status === 'connected');
+    if (!form.account_profile_id && accountList.length) {
+      const matching = accountList.find((item) => item.worker_id === form.worker_id && item.status === 'connected');
       if (matching) update('account_profile_id', matching.id);
     }
-  }, [accounts.data, form.account_profile_id, form.worker_id]);
+  }, [accountList, form.account_profile_id, form.worker_id]);
   useEffect(() => {
     if (form.mode === 'orchestrated') {
       if (!orchestratorAccounts.some((item) => item.id === form.account_profile_id))
@@ -978,7 +1130,7 @@ function NewSessionDialog({
           Worker
           <select value={form.worker_id} onChange={(event) => update('worker_id', event.target.value)}>
             {[
-              ...(workers.data ?? [])
+              ...workerList
                 .sort((a, b) => Number(b.status === 'online') - Number(a.status === 'online'))
                 .map((item) => (
                   <option key={item.id} value={item.id}>
@@ -987,7 +1139,7 @@ function NewSessionDialog({
                 )),
             ]}
           </select>
-          {!workers.loading && !workers.data?.some((worker) => worker.status === 'online') && (
+          {!workers.loading && !workerList.some((worker) => worker.status === 'online') && (
             <small className="field-error">{t('Нет online worker — сессия останется в очереди.')}</small>
           )}
         </label>
@@ -999,7 +1151,7 @@ function NewSessionDialog({
               onChange={(event) => update('account_profile_id', event.target.value)}
             >
               <option value="">{t('без профиля')}</option>
-              {(form.mode === 'orchestrated' ? orchestratorAccounts : (accounts.data ?? []))
+              {(form.mode === 'orchestrated' ? orchestratorAccounts : accountList)
                 .filter((item) => !form.worker_id || item.worker_id === form.worker_id)
                 .map((item) => (
                   <option key={item.id} value={item.id}>
@@ -1232,7 +1384,7 @@ function ExecutorPanel({ session }: { session: Session }): JSX.Element {
         <h2>{t('План')}</h2>
         {view.data?.plan_updated_at && (
           <small className="muted">
-            {t('обновлён')} {ago(view.data.plan_updated_at)}
+            {t('обновлён')} <TimeAgo value={view.data.plan_updated_at} />
           </small>
         )}
       </div>

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
-import { ago, useApi } from '../api/useApi';
+import { useApi } from '../api/useApi';
 import { MarkdownView } from '../components/MarkdownView';
 import { ConfirmDialog, EmptyState, ErrorBanner, Loading, StatusIcon } from '../components/ui';
 import { Icon } from '../components/ui/icons';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 type DraftSession = { id: string; status: string; title: string; project_id: string };
 type Draft = {
@@ -114,7 +115,7 @@ export function Drafts(): JSX.Element {
                   <strong>{draft.title}</strong>
                 </button>
                 <small className="muted">
-                  {draft.project_id} · {draft.created_at ? ago(draft.created_at) : draft.name}
+                  {draft.project_id} · {draft.created_at ? <TimeAgo value={draft.created_at} /> : draft.name}
                 </small>
               </div>
               {open === draft.id ? (

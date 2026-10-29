@@ -1,9 +1,12 @@
-import { FormEvent, useState } from 'react';
-import { api } from '../api/client';
-import { ago, errorText, useApi } from '../api/useApi';
-import type { AccountProfile, Worker } from '../api/types';
+import { FormEvent, useEffect, useState } from 'react';
+import { ApiError, api } from '../api/client';
+import { arrayOrEmpty, errorText, useApi } from '../api/useApi';
+import type { AccountProfile, FoundLogin, NextAccountId, Worker } from '../api/types';
 import { Dialog, EmptyState, ErrorBanner, Loading, StatusBadge } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
+import { WorkerTerminal } from '../components/Terminal';
+import { useCurrentUser } from '../auth/session';
 
 const kinds = [
   ['claude_code_subscription', t('Claude Code — подписка')],
@@ -21,8 +24,11 @@ const secretKinds = new Set(['anthropic_api', 'openai_api', 'gemini_api', 'openr
 export function Accounts(): JSX.Element {
   const accounts = useApi<AccountProfile[]>('/accounts');
   const workers = useApi<Worker[]>('/workers');
+  const accountList = arrayOrEmpty(accounts.data);
+  const workerList = arrayOrEmpty(workers.data);
   const missing = accounts.error.includes('(404)');
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardKind, setWizardKind] = useState<string | undefined>();
   const [selected, setSelected] = useState<AccountProfile | null>(null);
   const reload = () => accounts.reload();
 
@@ -33,10 +39,37 @@ export function Accounts(): JSX.Element {
           <p className="eyebrow">{t('НАСТРОЙКИ')}</p>
           <h1>{t('Аккаунты и модели')}</h1>
           <p className="muted">
-            {t('Две независимые подписки Claude Code — два профиля; у каждого свой каталог настроек.')}
+            {t('Несколько профилей Claude Code используют общие настройки; отдельным остаётся только вход.')}
           </p>
         </div>
-        <button onClick={() => setShowWizard(true)}>{t('Добавить аккаунт')}</button>
+        <div className="page-heading-actions">
+          <button
+            onClick={() => {
+              setWizardKind('claude_code_subscription');
+              setShowWizard(true);
+            }}
+          >
+            {t('+ Добавить Claude')}
+          </button>
+          <button
+            className="button-secondary"
+            onClick={() => {
+              setWizardKind('codex_subscription');
+              setShowWizard(true);
+            }}
+          >
+            {t('+ Добавить Codex')}
+          </button>
+          <button
+            className="button-secondary"
+            onClick={() => {
+              setWizardKind(undefined);
+              setShowWizard(true);
+            }}
+          >
+            {t('Добавить аккаунт')}
+          </button>
+        </div>
       </div>
       {missing ? (
         <div className="notice">
@@ -47,24 +80,27 @@ export function Accounts(): JSX.Element {
         <ErrorBanner message={accounts.error} />
       ) : null}
       {!missing && !accounts.data ? <Loading /> : null}
-      {!missing && accounts.data?.length === 0 ? <EmptyState>{t('Аккаунтов пока нет.')}</EmptyState> : null}
-      {!missing && workers.data?.length === 0 && (
+      {!missing && accountList.length === 0 ? <EmptyState>{t('Аккаунтов пока нет.')}</EmptyState> : null}
+      {!missing && workerList.length === 0 && (
         <div className="notice" role="status">
           <strong>{t('Сначала зарегистрируйте worker')}</strong>
           <span>{t('Новый профиль нельзя подключить без безопасного места выполнения.')}</span>
         </div>
       )}
+      {!missing && !showWizard && <FoundLogins onCreated={reload} />}
       <div className="account-grid">
-        {accounts.data?.map((account) => (
+        {accountList.map((account) => (
           <AccountCard key={account.id} account={account} onChange={reload} onSelect={setSelected} />
         ))}
       </div>
       {showWizard && (
         <AccountWizard
-          workers={workers.data ?? []}
+          workers={workerList}
+          initialKind={wizardKind}
           onClose={() => setShowWizard(false)}
           onCreated={() => {
             setShowWizard(false);
+            setWizardKind(undefined);
             reload();
           }}
         />
@@ -72,7 +108,7 @@ export function Accounts(): JSX.Element {
       {selected && (
         <AccountActions
           account={selected}
-          workers={workers.data ?? []}
+          workers={workerList}
           onClose={() => setSelected(null)}
           onChange={() => {
             setSelected(null);
@@ -81,6 +117,58 @@ export function Accounts(): JSX.Element {
         />
       )}
     </>
+  );
+}
+
+function FoundLogins({ onCreated }: { onCreated: () => void }): JSX.Element | null {
+  const found = useApi<FoundLogin[]>('/accounts/found-logins', { refreshMs: 30_000 });
+  const foundLogins = arrayOrEmpty(found.data);
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+  if (!foundLogins.length) return found.error ? <ErrorBanner message={found.error} /> : null;
+  const adopt = async (item: FoundLogin) => {
+    setBusy(`${item.worker_id}:${item.engine}`);
+    setError('');
+    try {
+      await api<AccountProfile>('/accounts', {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: item.kind,
+          worker_id: item.worker_id,
+          adopt_found_login: true,
+        }),
+      });
+      onCreated();
+      found.reload();
+    } catch (cause) {
+      setError(errorText(cause, t('Не удалось использовать найденный вход')));
+    } finally {
+      setBusy('');
+    }
+  };
+  return (
+    <section className="panel found-logins" aria-label={t('Найденные входы')}>
+      <div className="panel-heading">
+        <h2>{t('Найденные входы')}</h2>
+      </div>
+      {error && <ErrorBanner message={error} />}
+      {foundLogins.map((item) => (
+        <div className="found-login" key={`${item.worker_id}-${item.engine}`}>
+          <div>
+            <strong>{item.engine === 'claude' ? t('Claude') : t('Codex')}</strong> · {item.worker_id}
+            {item.identity && <span className="muted"> · {item.identity}</span>}
+          </div>
+          <button onClick={() => void adopt(item)} disabled={busy !== ''}>
+            {busy === `${item.worker_id}:${item.engine}`
+              ? t('Подключение…')
+              : t(
+                  'Использовать вход {0}, уже выполненный на этой машине',
+                  item.engine === 'claude' ? 'Claude' : 'Codex',
+                )}
+          </button>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -108,7 +196,7 @@ function AccountCard({
         <StatusBadge value={account.status} />
       </div>
       <dl>
-        <dt>Worker</dt>
+        <dt>{t('Worker')}</dt>
         <dd>{account.worker_id}</dd>
         <dt>{t('Модель')}</dt>
         <dd>{account.default_model ?? t('не выбрана')}</dd>
@@ -126,12 +214,29 @@ function AccountCard({
             <dd>{account.status_detail}</dd>
           </>
         )}
+        {account.identity && (
+          <>
+            <dt>{t('Вошёл как')}</dt>
+            <dd>{account.identity}</dd>
+          </>
+        )}
+        {!!account.duplicate_of?.length && (
+          <dd className="notice warning">
+            {t('Этот аккаунт уже подключён в профиле {0}', account.duplicate_of.join(', '))}
+          </dd>
+        )}
         <dt>{t('Проверка')}</dt>
-        <dd>{ago(account.checked_at)}</dd>
+        <dd>
+          <TimeAgo value={account.checked_at} />
+        </dd>
       </dl>
       <div className="card-actions">
         <button onClick={check}>{t('Проверить')}</button>
-        <button className="button-secondary" onClick={() => onSelect(account)}>
+        <button
+          className="button-secondary"
+          aria-label={t('Действия: {0}', account.name)}
+          onClick={() => onSelect(account)}
+        >
           {t('Действия')}
         </button>
       </div>
@@ -141,21 +246,32 @@ function AccountCard({
 
 function AccountWizard({
   workers,
+  initialKind,
   onClose,
   onCreated,
 }: {
   workers: Worker[];
+  initialKind?: string;
   onClose: () => void;
   onCreated: () => void;
 }): JSX.Element {
   const [step, setStep] = useState(1);
-  const [kind, setKind] = useState<string>(kinds[0][0]);
+  const [kind, setKind] = useState<string>(initialKind ?? kinds[0][0]);
   const [form, setForm] = useState({ id: '', name: '', worker_id: workers[0]?.id ?? '', base_url: '', model: '' });
   const [error, setError] = useState('');
   const [created, setCreated] = useState<AccountProfile | null>(null);
   const [loginSteps, setLoginSteps] = useState<LoginStep[]>([]);
   const [secret, setSecret] = useState('');
   const [idEdited, setIdEdited] = useState(false);
+  useEffect(() => {
+    if (!initialKind) return;
+    setKind(initialKind);
+    void api<NextAccountId>(`/accounts/next-id?kind=${encodeURIComponent(initialKind)}`)
+      .then((next) => {
+        setForm((current) => ({ ...current, id: next.id, name: next.name }));
+      })
+      .catch((cause) => setError(errorText(cause, t('Не удалось подобрать ID аккаунта'))));
+  }, [initialKind]);
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const updateName = (name: string) => {
     setForm((current) => ({ ...current, name, ...(idEdited ? {} : { id: profileIdFromName(name) }) }));
@@ -260,7 +376,7 @@ function AccountWizard({
               <input value={form.name} onChange={(event) => updateName(event.target.value)} required />
             </label>
             <label>
-              Worker
+              {t('Worker')}
               <select value={form.worker_id} onChange={(event) => update('worker_id', event.target.value)} required>
                 {workers.map((worker) => (
                   <option key={worker.id} value={worker.id}>
@@ -309,6 +425,11 @@ function AccountWizard({
                 )}
               </div>
             )}
+            <FoundLogins
+              onCreated={() => {
+                onCreated();
+              }}
+            />
             {secretKinds.has(kind) && (
               <>
                 <label>
@@ -357,19 +478,54 @@ function AccountActions({
   onClose: () => void;
   onChange: () => void;
 }): JSX.Element {
+  const user = useCurrentUser();
   const [steps, setSteps] = useState<LoginStep[]>([]);
   const [error, setError] = useState('');
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginShell, setLoginShell] = useState('');
+  const [resultWorkerId, setResultWorkerId] = useState('');
+  const [loginIdentity, setLoginIdentity] = useState(account.identity ?? '');
   const run = async (path: string, init?: RequestInit) => {
     try {
       await api(path, init);
       onChange();
     } catch (cause) {
-      setError(errorText(cause, t('Операция не удалась')));
+      setError(
+        init?.method === 'DELETE' && cause instanceof ApiError && cause.status === 409
+          ? t('Профиль нельзя удалить: у него есть активные сессии.')
+          : errorText(cause, t('Операция не удалась')),
+      );
     }
   };
   const assign = async (worker_id: string) =>
     run(`/accounts/${account.id}`, { method: 'PATCH', body: JSON.stringify({ worker_id }) });
   const login = async () => {
+    try {
+      setLoginBusy(true);
+      setError('');
+      const result = await api<{ engine: string; shell: string; worker_id: string }>(
+        `/accounts/${account.id}/login-command`,
+      );
+      setLoginShell(result.shell);
+      setResultWorkerId(result.worker_id);
+      setTerminalOpen(true);
+      await api(`/accounts/${account.id}/login-started`, { method: 'POST' });
+      // The worker checks watched profiles every five seconds; stop after the contract's five-minute window.
+      for (let elapsed = 0; elapsed < 300_000; elapsed += 5_000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 5_000));
+        const current = await api<AccountProfile>(`/accounts/${account.id}`);
+        setLoginIdentity(current.identity ?? '');
+        onChange();
+        if (current.status === 'connected') break;
+      }
+    } catch (cause) {
+      setError(errorText(cause, t('Не удалось открыть вход')));
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+  const loginInstructions = async () => {
     try {
       const result = await api<{ steps: LoginStep[] }>(`/accounts/${account.id}/login-instructions`, {
         method: 'POST',
@@ -401,10 +557,33 @@ function AccountActions({
           </div>
         ) : (
           <>
+            {subscriptionKinds.has(account.kind) && user?.role === 'admin' && (
+              <button onClick={() => void login()} disabled={loginBusy}>
+                {loginBusy ? t('Ожидание входа…') : t('Войти')}
+              </button>
+            )}
+            {subscriptionKinds.has(account.kind) && user?.role !== 'admin' && (
+              <div className="notice" role="status">
+                <strong>{t('Встроенный терминал доступен только администраторам.')}</strong>
+                <span>{t('Используйте пошаговую инструкцию входа на компьютере с worker-ом.')}</span>
+              </div>
+            )}
+            {terminalOpen && user?.role === 'admin' && (
+              <div className="login-terminal">
+                <WorkerTerminal workerId={resultWorkerId || account.worker_id} command={loginShell} />
+              </div>
+            )}
             {subscriptionKinds.has(account.kind) && steps.length === 0 && (
-              <button onClick={login}>{t('Как войти в аккаунт — пошагово')}</button>
+              <button className="button-secondary" onClick={() => void loginInstructions()}>
+                {t('Запасной путь: инструкция входа')}
+              </button>
             )}
             {steps.length > 0 && <LoginSteps steps={steps} />}
+            {loginIdentity && (
+              <p className="notice" role="status">
+                {t('Вошёл как')}: <strong>{loginIdentity}</strong>
+              </p>
+            )}
             <button
               onClick={() => {
                 void run(`/accounts/${account.id}/check`, { method: 'POST' });
@@ -424,17 +603,15 @@ function AccountActions({
             {t('Отключить')}
           </button>
         )}
-        {account.status === 'disabled' && (
-          <button
-            className="button-secondary"
-            onClick={() => {
-              if (window.confirm(t('Удалить отключённый аккаунт?')))
-                run(`/accounts/${account.id}`, { method: 'DELETE' });
-            }}
-          >
-            {t('Удалить')}
-          </button>
-        )}
+        <button
+          className="button-danger"
+          onClick={() => {
+            if (window.confirm(t('Удалить аккаунт {0}?', account.name)))
+              void run(`/accounts/${account.id}`, { method: 'DELETE' });
+          }}
+        >
+          {t('Удалить')}
+        </button>
       </section>
     </Dialog>
   );

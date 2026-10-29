@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import type { Notification } from '../api/types';
-import { ago, useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorBanner, Loading, StatusBadge, Toolbar } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 export function Notifications(): JSX.Element {
   const [category, setCategory] = useState('');
@@ -21,8 +22,9 @@ export function Notifications(): JSX.Element {
   };
   // The same count as the bell, not just the rows on screen (the list is limited).
   const unreadList = useApi<Notification[]>('/notifications?unread=true', { refreshMs: 15_000 });
-  const unread = unreadList.data?.length ?? (data.data ?? []).filter((item) => !item.read_at).length;
-  const categories = [...new Set((data.data ?? []).map((item) => item.category))];
+  const items = arrayOrEmpty(data.data);
+  const unread = arrayOrEmpty(unreadList.data).length || items.filter((item) => !item.read_at).length;
+  const categories = [...new Set(items.map((item) => item.category))];
   return (
     <>
       <div className="page-heading">
@@ -63,17 +65,19 @@ export function Notifications(): JSX.Element {
         {data.error && <ErrorBanner message={data.error} />}
         {data.loading && !data.data ? (
           <Loading />
-        ) : !data.data?.length ? (
+        ) : !items.length ? (
           <EmptyState>{t('Уведомлений нет.')}</EmptyState>
         ) : (
           <ul className="notification-list">
-            {data.data.map((item) => (
+            {items.map((item) => (
               <li className={item.read_at ? 'read' : ''} key={item.id}>
                 <div>
                   <div className="event-meta">
                     <StatusBadge value={item.severity} />
                     <strong>{item.title}</strong>
-                    <time>{ago(item.created_at)}</time>
+                    <time>
+                      <TimeAgo value={item.created_at} />
+                    </time>
                   </div>
                   <p>{item.body}</p>
                   {item.project_id && (

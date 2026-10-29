@@ -2,7 +2,7 @@ import { lazy, Suspense, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { tokenKey, useCurrentUser } from './auth/session';
+import { useSession } from './auth/session';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { ProjectDetail } from './pages/ProjectDetail';
@@ -44,8 +44,8 @@ function PageFallback(): JSX.Element {
 }
 
 function PrivateRoutes(): JSX.Element {
-  const user = useCurrentUser();
-  if (!sessionStorage.getItem(tokenKey)) return <Navigate to="/login" replace />;
+  const { user, signedOut } = useSession();
+  if (signedOut) return <Navigate to="/login" replace />;
   if (!user) return <p className="loading-screen">{t('Загрузка профиля…')}</p>;
   return (
     <Suspense fallback={<PageFallback />}>

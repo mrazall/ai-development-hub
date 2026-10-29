@@ -4,6 +4,7 @@ CI sets AIHUB_DATABASE_URL / AIHUB_DB_PASSWORD_FILE to a throwaway Postgres and 
 so an unreachable database fails the run instead of silently skipping integration tests.
 """
 import os
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -30,3 +31,12 @@ def skip_or_fail(reason: str) -> None:
     if os.environ.get("AIHUB_REQUIRE_INTEGRATION") == "1":
         pytest.fail(f"integration dependency required in this run: {reason}")
     pytest.skip(reason)
+
+
+def import_worker():
+    """Import the real worker, failing instead of silently skipping when required."""
+    try:
+        return import_module("aihub_agents.worker").Worker
+    except ImportError as exc:
+        skip_or_fail(f"aihub_agents.worker is unavailable: {exc}")
+        raise AssertionError("skip_or_fail() must not return")

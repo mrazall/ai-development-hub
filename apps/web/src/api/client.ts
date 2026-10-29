@@ -20,7 +20,25 @@ function errorMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+let refreshing: Promise<boolean> | null = null;
+
+/** Get a new access token from the device's sign-in cookie (kept 30 days from the last use). */
+export function refreshSession(): Promise<boolean> {
+  refreshing ??= fetch('/api/v0/auth/refresh', { method: 'POST' })
+    .then(async (response) => {
+      if (!response.ok) return false;
+      const body = (await response.json()) as { access_token: string };
+      sessionStorage.setItem(tokenKey, body.access_token);
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+export async function api<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const token = sessionStorage.getItem(tokenKey);
   const headers = new Headers(init.headers);
   if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
@@ -37,6 +55,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (response.status === 401) {
     sessionStorage.removeItem(tokenKey);
+    // The hour-long access token ran out: renew it silently and repeat the request once.
+    if (!retried && !/^\/auth\/(login|refresh|logout)/.test(path) && (await refreshSession()))
+      return api<T>(path, init, true);
     window.dispatchEvent(new Event('unauthorized'));
   }
   if (response.status === 403) throw new ApiError(403, errorMessage(body, t('Нет прав для этой операции')));
@@ -51,5 +72,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export function logout(): void {
   sessionStorage.removeItem(tokenKey);
+  // Ends this device's sign-in on the server; other devices stay signed in.
+  void fetch('/api/v0/auth/logout', { method: 'POST' }).catch(() => undefined);
   window.dispatchEvent(new Event('unauthorized'));
 }

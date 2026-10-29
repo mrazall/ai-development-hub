@@ -1,7 +1,7 @@
 .chat-form {
   display: flex;
   gap: 0.6rem;
-  margin-top: 0.8rem;
+  margin-top: 1.4rem;
 }
 .mode-switch {
   display: grid;
@@ -57,9 +57,17 @@
   font-weight: 650;
   font-size: 0.84rem;
 }
-.chat-form input {
+.chat-form input,
+.chat-form textarea {
   min-width: 0;
   flex: 1;
+}
+.chat-form textarea {
+  resize: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  line-height: 1.45;
+  font: inherit;
 }
 .attachment-chips {
   display: flex;

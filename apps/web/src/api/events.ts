@@ -15,6 +15,7 @@ export const eventKinds = [
   'handoff',
   'heartbeat',
   'plan',
+  'session.account_switched',
 ] as const;
 
 export const notificationEventKind = 'notification';

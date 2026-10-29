@@ -44,7 +44,7 @@ function enableCopy(term: Terminal, container: HTMLElement): () => void {
   return () => container.removeEventListener('contextmenu', onContextMenu);
 }
 
-function ShellTerminal({ sessionId }: { sessionId: string }): JSX.Element {
+function ShellTerminal({ terminalId, initialInput }: { terminalId: string; initialInput?: string }): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>({ kind: 'connecting' });
   const [attempt, setAttempt] = useState(0);
@@ -106,7 +106,7 @@ function ShellTerminal({ sessionId }: { sessionId: string }): JSX.Element {
       if (stopped) return;
       // The ticket goes in the first frame, never in the URL (access logs record query strings).
       const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${scheme}://${location.host}/api/v0/terminal/${encodeURIComponent(sessionId)}/ws`);
+      const ws = new WebSocket(`${scheme}://${location.host}/api/v0/terminal/${encodeURIComponent(terminalId)}/ws`);
       socket = ws;
       let fatal = false;
       ws.onopen = () => {
@@ -124,6 +124,7 @@ function ShellTerminal({ sessionId }: { sessionId: string }): JSX.Element {
           lastSize = '';
           setStatus({ kind: 'connected' });
           sendSize();
+          if (initialInput) send({ t: 'i', d: `${initialInput}\n` });
         } else if (frame.t === 'o') {
           term.write(frame.d);
         } else if (frame.t === 'x') {
@@ -159,7 +160,7 @@ function ShellTerminal({ sessionId }: { sessionId: string }): JSX.Element {
       socket?.close();
       term.dispose();
     };
-  }, [sessionId, attempt]);
+  }, [terminalId, attempt, initialInput]);
 
   const label =
     status.kind === 'connecting'
@@ -190,6 +191,11 @@ function ShellTerminal({ sessionId }: { sessionId: string }): JSX.Element {
       <div className="session-terminal-screen" ref={containerRef} />
     </section>
   );
+}
+
+/** Admin-only worker relay used by account login. The server resolves the relay id to a worker. */
+export function WorkerTerminal({ workerId, command }: { workerId: string; command?: string }): JSX.Element {
+  return <ShellTerminal terminalId={workerId} initialInput={command} />;
 }
 
 // Agent prose is bright white (ANSI 97) and commands are dim: fine on dark, unreadable on a light canvas.
@@ -425,7 +431,7 @@ export function SessionTerminal({
         ))}
       </div>
       {tab === 'shell' ? (
-        <ShellTerminal sessionId={sessionId} />
+        <ShellTerminal terminalId={sessionId} />
       ) : extra ? (
         <section className="session-terminal session-terminal-extra" aria-label={extra.label}>
           {extra.content}

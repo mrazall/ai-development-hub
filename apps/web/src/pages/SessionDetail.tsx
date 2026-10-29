@@ -3,10 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { eventKinds, useEventStream } from '../api/events';
 import type { StreamEvent } from '../api/events';
 import type { Session, WorkerDetails } from '../api/types';
-import { ago, useApi } from '../api/useApi';
-import { ErrorBanner, Loading, StatusBadge } from '../components/ui';
+import { useApi } from '../api/useApi';
+import { ErrorBanner, Loading, StatusBadge, sessionStatus } from '../components/ui';
 import { SessionTerminal } from '../components/Terminal';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 // ТЗ, раздел 4: показывать источник статуса и не изображать непроверенный ход мыслей модели.
 const sourceLabel: Record<Session['status_source'], string> = {
@@ -57,7 +58,7 @@ export function SessionDetail(): JSX.Element {
           </h1>
           <p className="muted">{data.id}</p>
         </div>
-        <StatusBadge value={data.status} />
+        <StatusBadge value={sessionStatus(data)} />
       </div>
       <p>
         <Link className="button-secondary" to={`/sessions/${data.id}/files`}>
@@ -87,7 +88,9 @@ export function SessionDetail(): JSX.Element {
             <dt>{t('Источник статуса')}</dt>
             <dd>{sourceLabel[data.status_source] ?? data.status_source}</dd>
             <dt>{t('Обновлена')}</dt>
-            <dd>{ago(data.updated_at)}</dd>
+            <dd>
+              <TimeAgo value={data.updated_at} />
+            </dd>
           </dl>
         </section>
         <section className="panel">

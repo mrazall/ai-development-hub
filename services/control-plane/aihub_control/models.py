@@ -14,6 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import event
 from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 
@@ -59,6 +60,24 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), default=Role.viewer.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+
+class DeviceSession(Base):
+    """A signed-in browser or app. Only a hash of its refresh token is stored."""
+
+    __tablename__ = "device_sessions"
+    __table_args__ = {"schema": "control"}
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("control.users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # The token before the last rotation, accepted briefly so two tabs refreshing at once both stay signed in.
+    previous_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    user_agent: Mapped[str | None] = mapped_column(String(255))
 
 class Project(Base):
     __tablename__ = "projects"
@@ -115,6 +134,7 @@ class Worker(Base):
     labels: Mapped[list] = mapped_column(JSON, default=list)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lease_ttl_s: Mapped[int] = mapped_column(Integer, default=60)
+    found_logins: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
 
 
 class WorkerLease(Base):
@@ -177,6 +197,8 @@ class Session(Base):
     permission_mode: Mapped[str] = mapped_column(String(16), default="edits", server_default="edits", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+    # The owner looked at a failed session and marked it «всё ок»; the panel stops showing it red.
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AgentEvent(Base):
@@ -222,6 +244,9 @@ class AccountProfile(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending_login", nullable=False)
     status_detail: Mapped[str | None] = mapped_column(Text)
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    identity: Mapped[str | None] = mapped_column(String(255))
+    identity_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    login_watch_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
@@ -371,3 +396,9 @@ class SystemSetting(Base):
     value: Mapped[Any] = mapped_column(JSON)
     updated_by: Mapped[str | None] = mapped_column(String(128))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+@event.listens_for(Session.status, "set")
+def _status_changed(target, value, oldvalue, _initiator):
+    if value != oldvalue:
+        target.acknowledged_at = None

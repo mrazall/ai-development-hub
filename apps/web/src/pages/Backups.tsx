@@ -1,6 +1,7 @@
 import { ago, useApi } from '../api/useApi';
 import { ErrorBanner, Loading, StatusBadge } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 type Snapshot = {
   id: string;
@@ -85,7 +86,9 @@ export function Backups(): JSX.Element {
                 {statusesOf(status.data).map((item) => (
                   <div className="backup-status-row" key={item.kind ?? 'database'}>
                     <strong>{labels[item.kind ?? ''] ?? item.kind ?? t('Резервная копия')}</strong>
-                    <span>{item.last_success_at ? ago(item.last_success_at) : t('нет успешного снимка')}</span>
+                    <span>
+                      {item.last_success_at ? <TimeAgo value={item.last_success_at} /> : t('нет успешного снимка')}
+                    </span>
                     <StatusBadge value={item.rpo_exceeded ? 'failed' : 'ok'} />
                   </div>
                 ))}

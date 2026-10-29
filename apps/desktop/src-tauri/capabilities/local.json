@@ -1,0 +1,36 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local",
+  "description": "The app's own window (setup wizard, machine connection): every app command.",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-accounts",
+    "allow-check-hub",
+    "allow-check-machine",
+    "allow-check-update",
+    "allow-cli-install-command",
+    "allow-create-subscription",
+    "allow-detect-existing-worker",
+    "allow-disconnect-machine",
+    "allow-fix-wslconfig",
+    "allow-found-logins",
+    "allow-get-settings",
+    "allow-install-cli",
+    "allow-install-worker",
+    "allow-login",
+    "allow-login-account",
+    "allow-open-app-settings",
+    "allow-open-panel",
+    "allow-register-worker",
+    "allow-reinstall-worker",
+    "allow-restart-worker",
+    "allow-save-settings",
+    "allow-set-autostart",
+    "allow-update-app",
+    "allow-worker-logs",
+    "allow-worker-status"
+  ]
+}

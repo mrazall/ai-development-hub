@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -169,6 +170,7 @@ export const STATUS_LABELS: Record<string, string> = {
   waiting_approval: t('ждёт подтверждения'),
   blocked: t('заблокировано'),
   failed: t('ошибка'),
+  acknowledged: t('разобрано'),
   completed: t('завершено'),
   pending: t('ожидает'),
   approved: t('разрешено'),
@@ -189,6 +191,13 @@ export const STATUS_LABELS: Record<string, string> = {
 };
 
 export type StatusTone = 'working' | 'success' | 'danger' | 'warning' | 'neutral';
+
+/** A session's status as shown: a failure the owner marked «всё ок» is no longer red. */
+export function sessionStatus(session: { status: string; acknowledged_at?: string | null }): string {
+  return session.acknowledged_at && ['failed', 'offline', 'blocked'].includes(session.status)
+    ? 'acknowledged'
+    : session.status;
+}
 
 /** One mapping for the whole site: work in progress is green and pulses, errors are red, done is a check. */
 export function statusTone(value: string): StatusTone {
@@ -269,6 +278,7 @@ export function Dialog({
   onClose: () => void;
 }): JSX.Element | null {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = `dialog-title-${useId()}`;
   const previous = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -294,16 +304,18 @@ export function Dialog({
   if (!open) return null;
   return (
     <dialog
+      {...props}
       ref={ref}
       className="ui-dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      {...props}
     >
       <div className="ui-dialog-content">
         <div className="ui-dialog-heading">
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <IconButton label={t('Закрыть')} onClick={onClose}>
             <Icon name="close" />
           </IconButton>

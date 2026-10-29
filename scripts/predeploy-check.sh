@@ -1,6 +1,6 @@
 #!/bin/bash
 # predeploy-check.sh — everything that must pass before a deploy: lint, unit/integration tests of the three
-# Python parts (including the user-scenario tests with a real worker), web prettier/lint/types.
+# Python parts (including the user-scenario tests with a real worker), web prettier/lint/types, desktop rustfmt.
 # Runs inside the Linux/WSL dev checkout. Needs the dev Postgres (scripts/dev) and per-part venvs:
 #   AIHUB_VENV_CONTROL, AIHUB_VENV_AGENTS, AIHUB_VENV_KNOWLEDGE, AIHUB_VENV_MCP (default: <part>/.venv)
 #   AIHUB_TEST_DB (default postgresql+psycopg://aihub:aihub-dev-only@127.0.0.1:55432/aihub_predeploy)
@@ -36,8 +36,18 @@ step "mcp-knowledge"
 (cd "$ROOT/packages/mcp-knowledge" && PYTHONPATH=src "$VM/bin/python" -m pytest -q -p no:cacheprovider 2>&1 | tail -2; exit "${PIPESTATUS[0]}")
 check $? mcp-knowledge
 step "web (prettier, lint, types)"
-(cd "$ROOT/apps/web" && npx prettier --check src e2e >/dev/null && npm run -s lint >/dev/null && npm run -s typecheck >/dev/null)
+# Local prettier only: `npx` without node_modules silently fetches a different version.
+(cd "$ROOT/apps/web" && { [ -x node_modules/.bin/prettier ] || { echo "apps/web: run npm ci first"; exit 1; }; } \
+  && node_modules/.bin/prettier --check src e2e >/dev/null && npm run -s lint >/dev/null && npm run -s typecheck >/dev/null)
 check $? web
+step "desktop (cargo fmt --check)"
+CARGO=$(command -v cargo || echo "$HOME/.cargo/bin/cargo")
+if [ -x "$CARGO" ] && "$CARGO" fmt --version >/dev/null 2>&1; then
+  (cd "$ROOT/apps/desktop/src-tauri" && "$CARGO" fmt --check >/dev/null)
+  check $? desktop-fmt
+else
+  echo "   skipped: cargo/rustfmt not installed"
+fi
 
 if [ "$fail" -ne 0 ]; then echo "PREDEPLOY: FAILED"; exit 1; fi
 echo "PREDEPLOY: OK"

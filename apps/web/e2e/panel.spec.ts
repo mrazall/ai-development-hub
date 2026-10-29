@@ -85,7 +85,7 @@ test('worker registration shows the token exactly once', async ({ page }) => {
   await login(page, 'admin', adminPassword);
   await page.goto('/workers');
   await page.getByLabel('ID').fill(`worker-e2e-${run}`);
-  await page.getByLabel('Хост').fill('desktop-8eebsn3');
+  await page.getByLabel('Хост').fill('my-pc');
   await page.getByLabel('Метки').fill('gpu, wsl2');
   await page.getByRole('button', { name: 'Зарегистрировать' }).click();
   await expect(page.getByText('показывается один раз')).toBeVisible();

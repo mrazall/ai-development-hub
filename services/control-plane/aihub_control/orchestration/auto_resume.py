@@ -5,9 +5,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 
-from ..models import AccountLimit, AgentEvent, Session
+from ..models import AccountLimit, AgentEvent, Attachment, Session
 
 RESUME_TEXT = "Лимит восстановился — продолжай с того места, где остановился."
+CROSS_ACCOUNT_RESUME_MODE = "native"
 # Claude: "You've hit your session limit · resets 12am (Europe/Moscow)"; Codex: "You've hit your usage limit".
 LIMIT_RE = re.compile(r"hit your (session|weekly|usage|opus|five.hour)? ?limit|usage limit reached|rate limit reached", re.IGNORECASE)
 RESETS_RE = re.compile(r"resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:\(([^)]+)\))?", re.IGNORECASE)
@@ -80,11 +81,25 @@ def schedule_if_limited(db, session: Session, now: datetime | None = None) -> da
 
 
 def resume_session(db, original: Session, text: str, attachment_ids=None, model=None, fresh=False, effort=None,
-                   permission_mode=None, user=None) -> Session:
-    """Continue a finished session: orchestration roles in place, others as a child that keeps the conversation."""
+                   permission_mode=None, user=None, account_profile_id=None) -> Session:
+    """Continue a finished session in place: the same session runs again on the same agent conversation (the
+    owner opens a new session when they want one). Personal chats keep a child per message (chat_id threads)."""
     original.resume_at = None
-    if original.role in {"orchestrator", "executor"}:
-        # Orchestration is keyed by session id (orch_* scope, orch_wait on executors), so it resumes in place.
+    if not original.chat_id:
+        if model:
+            original.model = model
+        original.context_fresh = fresh
+        if account_profile_id:
+            original.account_profile_id = account_profile_id
+        if effort:
+            original.mcp_config = {**(original.mcp_config or {}), "effort": effort}
+        if permission_mode:
+            original.permission_mode = permission_mode
+        if original.permission_mode == "ask" and original.engine == "claude_code" and not (original.mcp_config or {}).get("user_id"):
+            owner_id = user.id if user else None
+            if owner_id:
+                from ..routers.chats import _mcp_config
+                original.mcp_config = {**(original.mcp_config or {}), "mcpServers": _mcp_config()["mcpServers"], "user_id": owner_id}
         original.status = "queued"
         original.status_source = "native"
         db.add(AgentEvent(session_id=original.id, kind="session.status", source="native", payload={"status": "queued", "reason": "продолжение"}))
@@ -104,7 +119,7 @@ def resume_session(db, original: Session, text: str, attachment_ids=None, model=
         workdir=original.workdir,
         branch=original.branch,
         parent_session_id=original.id,
-        account_profile_id=original.account_profile_id,
+        account_profile_id=account_profile_id or original.account_profile_id,
         workspace_ref=original.workspace_ref,
         title=original.title,
         engine_session_ref=original.engine_session_ref,
@@ -124,6 +139,12 @@ def resume_session(db, original: Session, text: str, attachment_ids=None, model=
             child.mcp_config = {**(child.mcp_config or {}), "mcpServers": _mcp_config()["mcpServers"], "user_id": owner_id}
     db.add(child)
     db.flush()
+    # The composer uploads files to the session on screen (the finished one); the continuation is a new
+    # session and the worker fetches only that session's attachments: move them over.
+    for attachment_id in (attachment_ids or [])[:10]:
+        attachment = db.get(Attachment, str(attachment_id))
+        if attachment and attachment.session_id == original.id:
+            attachment.session_id = child.id
     db.add(AgentEvent(
         session_id=child.id, kind="message", source="native",
         payload={"role": "user", "text": text, "attachment_ids": attachment_ids or []},
@@ -138,7 +159,9 @@ def resume_due(db, now: datetime | None = None) -> int:
     ).all()
     for session in due:
         if session.status in {"completed", "failed", "offline"}:
-            resume_session(db, session, RESUME_TEXT)
+            # Automatic resume is deliberately account-sticky.  Changing an account is
+            # only allowed through the explicit continue-on-account user action.
+            resume_session(db, session, RESUME_TEXT, account_profile_id=None)
         else:
             session.resume_at = None  # someone already woke it up
     db.commit()

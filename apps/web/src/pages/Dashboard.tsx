@@ -6,7 +6,7 @@ import type { SessionEvent } from '../api/types';
 import { EmptyState, ErrorBanner, Loading, StatusBadge } from '../components/ui';
 import { Link } from 'react-router-dom';
 import type { LimitsResponse } from '../api/types-limits';
-import { useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { t } from '../i18n';
 
 type Summary = {
@@ -51,7 +51,7 @@ export function Dashboard(): JSX.Element {
       </>
     );
   // The live stream replays history on (re)connect: merge by cursor so nothing is shown twice.
-  const byCursor = new Map(summary.events.map((event) => [event.cursor, event]));
+  const byCursor = new Map(arrayOrEmpty(summary.events).map((event) => [event.cursor, event]));
   liveEvents.forEach((event) => byCursor.set(event.cursor, event));
   // Only what a person acts on: replies, status changes, approvals, file changes. Engine bookkeeping,
   // streamed partials and raw tool traffic stay in the session's Events tab; repeats collapse.

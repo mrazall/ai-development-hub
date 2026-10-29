@@ -122,6 +122,7 @@ class SessionOut(SessionIn):
     model_config = ConfigDict(from_attributes=True)
     id: str
     status: str
+    acknowledged_at: datetime | None = None
     status_source: str
     created_at: datetime
     updated_at: datetime
@@ -309,13 +310,14 @@ ACCOUNT_STATUSES = {"pending_login", "connected", "error", "disabled"}
 
 
 class AccountIn(BaseModel):
-    id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")
-    name: str = Field(min_length=1, max_length=255)
+    id: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")
+    name: str | None = Field(default=None, min_length=1, max_length=255)
     kind: str
-    worker_id: str = Field(min_length=1, max_length=128)
+    worker_id: str | None = Field(default=None, min_length=1, max_length=128)
     base_url: str | None = None
     default_model: str | None = None
     models: list[str] = []
+    adopt_found_login: bool = False
 
 
 class AccountPatch(BaseModel):
@@ -343,6 +345,10 @@ class AccountOut(BaseModel):
     checked_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    identity: str | None = None
+    identity_checked_at: datetime | None = None
+    login_watch_until: datetime | None = None
+    duplicate_of: list[str] = []
 
 
 class SecretIn(BaseModel):
@@ -352,6 +358,20 @@ class SecretIn(BaseModel):
 class AccountStatusIn(BaseModel):
     status: str
     detail: str | None = None
+    identity: str | None = Field(default=None, max_length=200, pattern=r"^[^\x00-\x1f\x7f]*$")
+
+
+class FoundLoginIn(BaseModel):
+    engine: Literal["claude", "codex"]
+    identity: str | None = Field(default=None, max_length=200, pattern=r"^[^\x00-\x1f\x7f]*$")
+
+
+class FoundLoginsIn(BaseModel):
+    logins: list[FoundLoginIn] = []
+
+
+class ContinueOnAccountIn(BaseModel):
+    account_profile_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,62}$")
 
 
 # --- MCP registry ---

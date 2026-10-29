@@ -1,6 +1,6 @@
-import { tokenKey } from '../api/client';
+import { refreshSession, tokenKey } from '../api/client';
 import type { Attachment } from '../api/types-ops';
-import { useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { Icon } from './ui/icons';
 import { t } from '../i18n';
 
@@ -12,7 +12,7 @@ export function useSessionAttachments(sessionId: string): Attachment[] {
 /** The same with a `loaded` flag, for views that must not render before the names are known. */
 export function useSessionAttachmentList(sessionId: string): { items: Attachment[]; loaded: boolean } {
   const list = useApi<Attachment[]>(`/sessions/${encodeURIComponent(sessionId)}/attachments`);
-  return { items: list.data ?? [], loaded: list.data !== null || Boolean(list.error) };
+  return { items: arrayOrEmpty(list.data), loaded: list.data !== null || Boolean(list.error) };
 }
 
 const size = (bytes: number) =>
@@ -22,9 +22,12 @@ const size = (bytes: number) =>
 
 // The download needs the bearer token, so a plain link would not do: fetch and save the blob.
 async function download(item: Attachment): Promise<void> {
-  const response = await fetch(`/api/v0/attachments/${encodeURIComponent(item.id)}`, {
-    headers: { Authorization: `Bearer ${sessionStorage.getItem(tokenKey) ?? ''}` },
-  });
+  const get = () =>
+    fetch(`/api/v0/attachments/${encodeURIComponent(item.id)}`, {
+      headers: { Authorization: `Bearer ${sessionStorage.getItem(tokenKey) ?? ''}` },
+    });
+  let response = await get();
+  if (response.status === 401 && (await refreshSession())) response = await get();
   if (!response.ok) return;
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement('a');

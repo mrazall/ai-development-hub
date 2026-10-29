@@ -3,13 +3,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import { useEventStream, type StreamEvent } from '../api/events';
 import type { AccountProfile, Chat, ChatMessage } from '../api/types';
-import { ago, useApi } from '../api/useApi';
+import { useApi } from '../api/useApi';
 import { ErrorBanner, Loading } from '../components/ui';
 import { MarkdownView } from '../components/MarkdownView';
 import { LogoMark } from '../components/Logo';
 import { CopyButton, QuoteSelection, quoteEvent } from '../components/copy';
 import { Icon } from '../components/ui/icons';
 import { t } from '../i18n';
+import { Thinking } from '../components/time';
+import { TimeAgo } from '../components/time';
 
 const CLAUDE_MODELS: [string, string][] = [
   ['claude-opus-5-5', 'Opus 5.5'],
@@ -218,7 +220,9 @@ function ChatRow({
           )}
           {chat.title || t('Новый чат')}
         </span>
-        <small>{ago(chat.updated_at)}</small>
+        <small>
+          <TimeAgo value={chat.updated_at} />
+        </small>
       </button>
       <button
         className="chat-row-menu"
@@ -385,11 +389,7 @@ function Conversation({
           <Message key={message.id ?? `${message.role}-${index}`} message={message} />
         ))}
         <QuoteSelection container={scrollRef} />
-        {(sending || running) && (
-          <div className="thinking">
-            <span /> <span /> <span /> {t('думает…')}
-          </div>
-        )}
+        {(sending || running) && <Thinking label={turnLabel(messages)} since={turnStart(messages)} />}
         {!nearBottom && (
           <button
             className="jump-latest"
@@ -421,6 +421,17 @@ function Conversation({
       </div>
     </div>
   );
+}
+
+// The current turn for the «working» line: since the last question; what the agent is doing now.
+function turnStart(messages: ChatMessage[]): string | undefined {
+  return [...messages].reverse().find((message) => message.role === 'user')?.created_at;
+}
+function turnLabel(messages: ChatMessage[]): string {
+  const last = messages[messages.length - 1];
+  if (last?.role === 'tool') return t('работает');
+  if (last?.role === 'assistant' && last.partial) return t('пишет');
+  return t('думает');
 }
 
 function mergeMessages(messages: ChatMessage[], events: StreamEvent[], sessionId: string): ChatMessage[] {
@@ -559,7 +570,7 @@ function Composer({
         value={text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             submit();
           }

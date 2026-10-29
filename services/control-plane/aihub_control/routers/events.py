@@ -26,6 +26,8 @@ def stream_ticket(user=Depends(current_user)):
 def events(
     after: int = 0,
     session_id: str | None = None,
+    # Several sessions as one feed: a session and its continuations (comma-separated ids).
+    session_ids: str | None = Query(None, max_length=2000),
     limit: int = Query(500, ge=1, le=5000),
     newest: bool = False,
     chat: bool = False,
@@ -35,7 +37,9 @@ def events(
 ):
     # newest=true: the latest `limit` events (a long session's history ends where the live stream starts).
     # view=chat|activity|events: drop engine bookkeeping per tab (see visible_events); chat=true is view=chat.
-    return visible_events(db, user, after, session_id, limit, newest=newest, view=view or ("chat" if chat else None))
+    ids = [item for item in (session_ids or "").split(",") if item][:50] or None
+    return visible_events(db, user, after, session_id, limit, newest=newest, view=view or ("chat" if chat else None),
+                          session_ids=ids)
 
 
 @router.get("/stream")

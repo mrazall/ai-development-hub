@@ -28,7 +28,7 @@ CHAT_RAW_TYPES = ("assistant", "item.completed")
 EVENT_VIEWS = ("chat", "activity", "events")
 
 
-def visible_events(db, principal, after, session_id=None, limit=500, newest=False, view=None):
+def visible_events(db, principal, after, session_id=None, limit=500, newest=False, view=None, session_ids=None):
     """Events after `after`, oldest first; with newest=True — the latest `limit` events (still returned oldest first).
     view: "chat" — what a conversation shows (final, non-technical messages, statuses, diffs, approvals);
     "activity" — that plus commands, their results and plain output (the agent terminal);
@@ -43,6 +43,8 @@ def visible_events(db, principal, after, session_id=None, limit=500, newest=Fals
     )
     if session_id:
         query = query.where(AgentEvent.session_id == session_id)
+    if session_ids:
+        query = query.where(AgentEvent.session_id.in_(session_ids))
     if view in EVENT_VIEWS:
         raw_type = AgentEvent.payload["raw_type"].as_string()
         partial = AgentEvent.payload["partial"].as_string()

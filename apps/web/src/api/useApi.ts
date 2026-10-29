@@ -3,6 +3,14 @@ import { api, changedEvent } from './client';
 import { t } from '../i18n';
 
 export type Loadable<T> = { data: T | null; error: string; loading: boolean; reload: () => void };
+const EMPTY_ARRAY: never[] = [];
+
+/** Keep list screens usable when an older/partial API response omits a collection. */
+export function arrayOrEmpty<T>(value: T[] | null | undefined): T[];
+export function arrayOrEmpty<T>(value: unknown): T[];
+export function arrayOrEmpty<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : (EMPTY_ARRAY as T[]);
+}
 
 /**
  * GET `path` (or skip when null); re-fetches when the path changes, on `reload()`, after any write made

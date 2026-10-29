@@ -413,3 +413,23 @@ textarea:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+/* The Windows app's block in the panel's settings. */
+.desktop-app .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+.desktop-app label.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.desktop-app .desktop-logs {
+  max-height: 320px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+}

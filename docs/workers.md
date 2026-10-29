@@ -49,3 +49,47 @@ Agents run with the worker user's permissions. Working directories are confined 
 paths, executors work in their own git worktrees, and non-interactive engines get an explicit allow-list of
 tools — but this is not a sandbox. Run workers under a dedicated user or VM if that matters to you; see
 [SECURITY.md](../SECURITY.md).
+
+## Worker is offline
+
+The hub marks a worker offline when its heartbeats stop; the reason is on the worker's side. Start with its
+journal — the worker says why it cannot reach the hub, once per change:
+
+```bash
+journalctl --user -u aihub-worker -n 50 --no-pager | grep -E "hub (un)?reachable"
+```
+
+- **`cannot resolve <host>`** — DNS on the worker machine does not know the hub's name. Typical in WSL2 on
+  Windows 10 after a reboot: the WSL DNS proxy (`nameserver` in `/etc/resolv.conf`, e.g. `172.29.x.1`) stops
+  answering, often with a VPN client or Tailscale changing Windows DNS, and `dnsTunneling` is not available on
+  Windows 10. Check and fix:
+
+  ```bash
+  getent hosts hub.<tailnet>.ts.net                 # empty = not resolved
+  tailscale ip -4 <hub-machine>                     # on Windows: the hub's tailnet address
+  ```
+
+  Then either point WSL to working DNS servers or pin the hub's tailnet address (stable while the machine stays
+  in the tailnet):
+
+  ```ini
+  # /etc/wsl.conf — keep WSL from overwriting the files below on restart
+  [network]
+  generateResolvConf = false
+  generateHosts = false
+  ```
+
+  ```bash
+  printf 'nameserver 192.168.1.1\nnameserver 1.1.1.1\n' | sudo tee /etc/resolv.conf   # your router + a public one
+  echo '100.x.y.z hub.<tailnet>.ts.net' | sudo tee -a /etc/hosts
+  wsl.exe --shutdown   # from Windows, then start the distro again
+  systemctl --user restart aihub-worker
+  ```
+
+  With `generateHosts = false` entries of the Windows `hosts` file no longer reach WSL.
+- **`does not answer in time` / `connection refused`** — the name resolves but the hub is not reachable: the
+  hub is down, a VPN routes the traffic elsewhere, or a firewall drops it. `curl -sS <hub>/api/v0/health`.
+- **`TLS error`** — a proxy or a wrong system clock.
+
+The Windows app checks this by itself: when the hub answers Windows but shows the worker offline, it looks from
+inside WSL (DNS, then a TCP connection) and shows the reason in the tray.

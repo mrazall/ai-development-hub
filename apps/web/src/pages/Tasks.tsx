@@ -3,10 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Project, Task, TaskStatus } from '../api/types';
 import { taskStatuses } from '../api/types';
-import { ago, errorText, useApi } from '../api/useApi';
+import { errorText, useApi } from '../api/useApi';
 import type { User } from '../auth/session';
-import { EmptyState, ErrorBanner, Input, Loading, StatusBadge, Table, Toolbar } from '../components/ui';
+import { EmptyState, ErrorBanner, Input, Loading, Table, Toolbar } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 export function Tasks({ user }: { user: User }): JSX.Element {
   const [params, setParams] = useSearchParams();
@@ -144,24 +145,14 @@ export function Tasks({ user }: { user: User }): JSX.Element {
                       {task.body && <p className="muted clamp">{task.body}</p>}
                     </td>
                     <td>
-                      {canWrite ? (
-                        <select
-                          aria-label={t('Статус задачи {0}', task.title)}
-                          value={task.status}
-                          onChange={(event) => void changeStatus(task, event.target.value as TaskStatus)}
-                        >
-                          {taskStatuses.map((value) => (
-                            <option key={value} value={value}>
-                              {value.replaceAll('_', ' ')}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <StatusBadge value={task.status} />
-                      )}
+                      <TaskStatusPicker
+                        task={task}
+                        readOnly={!canWrite}
+                        onChange={(next) => void changeStatus(task, next)}
+                      />
                     </td>
                     <td>
-                      <span title={new Date(task.updated_at).toLocaleString()}>{ago(task.updated_at)}</span>
+                      <TimeAgo value={task.updated_at} />
                     </td>
                   </tr>
                 ))}
@@ -215,5 +206,45 @@ function NewTask({ projectId, onCreated }: { projectId: string; onCreated: () =>
       {error && <ErrorBanner message={error} />}
       <button disabled={busy || !title.trim()}>{t('Создать задачу')}</button>
     </form>
+  );
+}
+
+const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
+  draft: t('черновик'),
+  ready: t('готова'),
+  in_progress: t('в работе'),
+  review: t('на проверке'),
+  done: t('сделана'),
+  cancelled: t('отменена'),
+};
+
+/** One button per status, each with its colour; the current one is filled. Read-only: only the current one. */
+function TaskStatusPicker({
+  task,
+  readOnly,
+  onChange,
+}: {
+  task: Task;
+  readOnly: boolean;
+  onChange: (next: TaskStatus) => void;
+}): JSX.Element {
+  const shown = readOnly ? [task.status] : taskStatuses;
+  return (
+    <div className="task-status-picker" role="radiogroup" aria-label={t('Статус задачи {0}', task.title)}>
+      {shown.map((value) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={task.status === value}
+          disabled={readOnly}
+          className={`task-status task-status-${value} ${task.status === value ? 'is-current' : ''}`}
+          onClick={() => task.status !== value && onChange(value)}
+        >
+          <span className="task-status-dot" aria-hidden="true" />
+          {TASK_STATUS_LABEL[value]}
+        </button>
+      ))}
+    </div>
   );
 }

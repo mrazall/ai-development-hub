@@ -105,6 +105,14 @@ Stop it with `./scripts/quickstart.sh --down` (data volumes are kept); `--reset`
 3. **Settings → Accounts**: add a profile per subscription and log the CLI in once under that profile.
 4. Point the knowledge service at your vault (`AIHUB_VAULT_HOST_DIR`) — [docs/configuration.md](docs/configuration.md).
 
+## Windows desktop app
+
+Windows users can install the Tauri desktop client, which opens the hub in its own window, runs the worker in WSL2,
+adds a tray indicator and can start with Windows. It requires Windows 10/11, WSL2 with Ubuntu and systemd, Python
+3.12+, and the agent CLIs you want to use. The installer is currently unsigned, so read the SmartScreen guidance and
+the clean-machine checklist in [docs/desktop.md](docs/desktop.md) before installing. The Windows build workflow is
+manual-only and uploads an artifact; it does not publish releases.
+
 ## How it works
 
 ```

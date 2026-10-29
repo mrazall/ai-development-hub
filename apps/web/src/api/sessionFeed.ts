@@ -1,31 +1,43 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { useEventStream } from './events';
 import type { SessionEvent } from './types';
-import { useApi } from './useApi';
+import { arrayOrEmpty, useApi } from './useApi';
 
 /**
  * Session history plus live events, de-duplicated by cursor and in order.
  * `view` asks the server to drop engine bookkeeping for that tab (chat, the agent terminal, the events
  * log), so a long run still shows its recent history. The live stream starts after the loaded history.
  */
+/**
+ * A session and its continuations are one conversation: session id → the ids of its thread, oldest first.
+ * The workspace provides it; the feeds (chat, agent terminal, events) show the whole thread.
+ */
+export const SessionThreads = createContext<Map<string, string[]>>(new Map());
+
 export function useSessionEvents(
   sessionId: string,
   limit = 300,
   view?: 'chat' | 'activity' | 'events',
 ): SessionEvent[] {
+  const threads = useContext(SessionThreads);
+  const ids = threads.get(sessionId) ?? [sessionId];
+  const key = ids.join(',');
   const history = useApi<SessionEvent[]>(
-    `/events?session_id=${encodeURIComponent(sessionId)}&limit=${limit}&newest=true${view ? `&view=${view}` : ''}`,
+    `/events?${ids.length > 1 ? `session_ids=${encodeURIComponent(key)}` : `session_id=${encodeURIComponent(sessionId)}`}&limit=${limit}&newest=true${view ? `&view=${view}` : ''}`,
   );
-  const loaded = history.data !== null && history.data.every((event) => event.session_id === sessionId);
-  const after = loaded ? Math.max(0, ...(history.data ?? []).map((event) => event.cursor)) : undefined;
+  const member = useMemo(() => new Set(key.split(',')), [key]);
+  const historyEvents = arrayOrEmpty(history.data);
+  const loaded = history.data !== null && historyEvents.every((event) => member.has(event.session_id));
+  const after = loaded ? Math.max(0, ...historyEvents.map((event) => event.cursor)) : undefined;
+  // New events come only from the newest session of the thread.
   const live = useEventStream({ sessionId, limit, enabled: after !== undefined, after });
   return useMemo(() => {
     const byCursor = new Map<number, SessionEvent>();
-    [...(history.data ?? []), ...live].forEach((event) => byCursor.set(event.cursor, event));
+    [...historyEvents, ...live].forEach((event) => byCursor.set(event.cursor, event));
     // While switching sessions the loader still holds the previous session's history for a moment;
     // cursors are global, so those foreign events would be taken as "already shown" for this one.
-    return [...byCursor.values()].filter((event) => event.session_id === sessionId).sort((a, b) => a.cursor - b.cursor);
-  }, [history.data, live, sessionId]);
+    return [...byCursor.values()].filter((event) => member.has(event.session_id)).sort((a, b) => a.cursor - b.cursor);
+  }, [history.data, historyEvents, live, member]);
 }
 
 export function isUserMessage(event: SessionEvent): boolean {

@@ -3,9 +3,10 @@ import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Project, Session } from '../api/types';
 import { sessionStatuses } from '../api/types';
-import { ago, useApi } from '../api/useApi';
-import { EmptyState, ErrorBanner, Input, Loading, StatusBadge, Table, Toolbar } from '../components/ui';
+import { useApi } from '../api/useApi';
+import { EmptyState, ErrorBanner, Input, Loading, StatusBadge, Table, Toolbar, sessionStatus } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 export function Sessions(): JSX.Element {
   const [params, setParams] = useSearchParams();
@@ -126,9 +127,11 @@ export function Sessions(): JSX.Element {
                   </td>
                   <td>{session.worker_id}</td>
                   <td>
-                    <StatusBadge value={session.status} />
+                    <StatusBadge value={sessionStatus(session)} />
                   </td>
-                  <td>{ago(session.updated_at)}</td>
+                  <td>
+                    <TimeAgo value={session.updated_at} />
+                  </td>
                   <td>
                     <DeleteSessionButton session={session} onDeleted={sessions.reload} />
                   </td>

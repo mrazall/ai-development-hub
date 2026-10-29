@@ -246,6 +246,13 @@ label {
   justify-content: space-between;
   gap: 1rem;
 }
+.page-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
 .stats-grid,
 .dashboard-columns,
 .detail-grid,
@@ -2545,33 +2552,55 @@ h1 {
 }
 .thinking {
   display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  align-items: baseline;
+  gap: 0.5rem;
   max-width: 780px;
   margin: 0 auto;
-  color: var(--muted);
-  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
-.thinking span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--primary);
-  animation: chat-pulse 1.2s infinite;
+/* Claude Code's working glyph: one accent character that changes shape (see components/time.tsx). */
+.thinking-glyph {
+  display: inline-block;
+  width: 1ch;
+  color: var(--accent);
+  font-size: 1.05rem;
+  text-align: center;
 }
-.thinking span:nth-child(2) {
-  animation-delay: 0.15s;
+/* A light sweeping across the word while the agent works. */
+.thinking-word {
+  background: linear-gradient(
+    90deg,
+    var(--text-muted) 0%,
+    var(--text-muted) 40%,
+    var(--text-primary) 50%,
+    var(--text-muted) 60%,
+    var(--text-muted) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-shimmer 2.2s linear infinite;
 }
-.thinking span:nth-child(3) {
-  animation-delay: 0.3s;
+.thinking-time {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
 }
-@keyframes chat-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
+@keyframes thinking-shimmer {
+  from {
+    background-position: 100% 0;
   }
-  50% {
-    opacity: 1;
+  to {
+    background-position: -150% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-word {
+    animation: none;
+    background: none;
+    color: var(--text-secondary);
   }
 }
 .jump-latest {
@@ -3171,6 +3200,13 @@ h1 {
   overflow: visible;
   background: transparent;
   border-radius: 0;
+}
+/* Room between the last message and the composer. The feed's height is set by its box and the messages
+   overflow it, so its bottom padding never shows when scrolled to the end; a spacer element does. */
+.session-terminal-extra > .chat-feed::after {
+  content: '';
+  flex: none;
+  height: 2.5rem;
 }
 .session-terminal-extra .chat-feed .chat-message {
   align-self: stretch;
@@ -4493,4 +4529,64 @@ h1 {
   align-items: center;
   gap: 0.4rem;
   cursor: pointer;
+}
+
+/* Tasks: a button per status, each with its colour (Tasks.tsx TaskStatusPicker). */
+.task-status-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  max-width: 26rem;
+}
+.task-status {
+  --task-tone: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 0;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.task-status:hover:not(:disabled) {
+  border-color: var(--task-tone);
+  color: var(--text-primary);
+}
+.task-status:disabled {
+  cursor: default;
+}
+.task-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--task-tone);
+}
+.task-status.is-current {
+  border-color: var(--task-tone);
+  background: color-mix(in srgb, var(--task-tone) 18%, transparent);
+  color: var(--text-primary);
+}
+.task-status-draft {
+  --task-tone: var(--text-muted);
+}
+.task-status-ready {
+  --task-tone: var(--text-primary);
+}
+.task-status-in_progress {
+  --task-tone: var(--status-working);
+}
+.task-status-review {
+  --task-tone: var(--status-warning);
+}
+.task-status-done {
+  --task-tone: var(--status-success);
+}
+.task-status-cancelled {
+  --task-tone: var(--status-error);
 }

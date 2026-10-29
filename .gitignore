@@ -23,3 +23,7 @@ apps/web/e2e/screenshots/
 .claude/worktrees/
 .claude/launch.json
 .aihub/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/*.tar.gz
+apps/desktop/ui/dist/

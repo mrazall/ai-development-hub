@@ -46,6 +46,7 @@ export const sessionStatuses = [
 
 export type Session = {
   id: string;
+  acknowledged_at?: string | null;
   task_id: string | null;
   project_id: string;
   worker_id: string;
@@ -154,6 +155,24 @@ export type AccountProfile = {
   checked_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  identity?: string | null;
+  identity_checked_at?: string | null;
+  duplicate_of?: string[];
+};
+
+export type FoundLogin = {
+  worker_id: string;
+  engine: 'claude' | 'codex';
+  identity: string | null;
+  kind: 'claude_code_subscription' | 'codex_subscription';
+};
+
+export type NextAccountId = { id: string; name: string };
+
+export type AlternativeAccount = {
+  account: AccountProfile;
+  limits: AccountUsage;
+  resume_mode: 'native' | 'summary';
 };
 
 export type McpServer = {

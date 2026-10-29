@@ -70,3 +70,29 @@ def test_project_delete_is_soft_and_active_sessions_block_it(client, admin_token
     assert client.delete("/api/v0/projects/demo", headers=auth(admin_token)).status_code == 204
     assert client.get("/api/v0/projects/demo", headers=auth(admin_token)).status_code == 200
     assert client.post("/api/v0/projects/demo/restore", headers=auth(admin_token)).status_code == 200
+
+
+def test_screenshot_sent_with_a_continuation_reaches_the_worker(client, admin_token, clean_schema):  # noqa: F811
+    # Found live: «Скриншот до меня не дошёл». The composer uploads to the finished session on screen; the
+    # continuation is a new session, and the worker lists only that session's attachments.
+    from aihub_control.db import get_session_factory
+    from aihub_control.models import Session
+
+    make_project(client, admin_token)
+    worker = client.post("/api/v0/workers", headers=auth(admin_token),
+                         json={"id": "worker-a", "host": "local", "kind": "linux"}).json()
+    session = make_session(client, admin_token)
+    _, factory = get_session_factory()
+    with factory() as db:
+        row = db.get(Session, session["id"])
+        row.status, row.engine_session_ref = "completed", "conv-1"
+        db.commit()
+    shot = client.post(f"/api/v0/sessions/{session['id']}/attachments", headers=auth(admin_token),
+                       files={"file": ("screen.png", io.BytesIO(b"\x89PNG\r\n\x1a\nshot"), "image/png")}).json()
+    child = client.post(f"/api/v0/sessions/{session['id']}/continue", headers=auth(admin_token),
+                        json={"text": "see the screenshot", "attachment_ids": [shot["id"]]}).json()
+    listed = client.get(f"/api/v0/assignments/{child['id']}/attachments", headers=auth(worker["worker_token"])).json()
+    assert [item["id"] for item in listed] == [shot["id"]]
+    content = client.get(f"/api/v0/assignments/{child['id']}/attachments/{shot['id']}",
+                         headers=auth(worker["worker_token"]))
+    assert content.status_code == 200 and content.content.endswith(b"shot")

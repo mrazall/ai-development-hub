@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
-from ..auth import current_principal, current_user, db_dep, hash_password, write_user
+from ..auth import current_principal, current_user, db_dep, hash_password, worker_principal, write_user
 from ..deps import is_admin, mark_offline
 from ..models import AgentEvent, Session, Worker, WorkerLease, WorkerToken
-from ..schemas import HeartbeatIn, WorkerIn, WorkerOut
+from ..schemas import FoundLoginsIn, HeartbeatIn, WorkerIn, WorkerOut
 
 router = APIRouter(prefix="/workers", tags=["workers"])
 
@@ -80,3 +80,17 @@ def heartbeat(
 def workers(user=Depends(current_user), db=Depends(db_dep)):
     mark_offline(db)
     return list(db.scalars(select(Worker)))
+
+
+@router.post("/{worker_id}/found-logins")
+def found_logins(worker_id: str, data: FoundLoginsIn, worker=Depends(worker_principal), db=Depends(db_dep)):
+    if worker.worker_id != worker_id:
+        raise HTTPException(403, "worker token is not authorized for this worker")
+    if any(item.engine not in {"claude", "codex"} for item in data.logins):
+        raise HTTPException(422, "unsupported login engine")
+    record = db.get(Worker, worker_id)
+    if not record:
+        raise HTTPException(404, "worker not found")
+    record.found_logins = [item.model_dump() for item in data.logins]
+    db.commit()
+    return {"accepted": True}

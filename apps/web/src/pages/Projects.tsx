@@ -53,6 +53,15 @@ export function Projects({ user }: { user: User }): JSX.Element {
   const [status, setStatus] = useState<'active' | 'archived' | 'trash'>('active');
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(initialForm);
+  // Say why «Создать» is disabled instead of only greying it out.
+  const idProblem =
+    !form.id || projectIdPattern.test(form.id)
+      ? ''
+      : projectIdPattern.test(form.id.toLowerCase())
+        ? t('Только строчные буквы: «{0}».', form.id.toLowerCase())
+        : form.id.length < 2
+          ? t('Слишком короткий ID: нужно от 2 символов.')
+          : t('Можно только a-z, 0-9 и дефис, первый символ — буква или цифра.');
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<ProjectSort>('updated_at');
   const [descending, setDescending] = useState(true);
@@ -226,7 +235,13 @@ export function Projects({ user }: { user: User }): JSX.Element {
             {t('ID проекта')}
             <Input value={form.id} onChange={(event) => setForm({ ...form, id: event.target.value })} required />
           </label>
-          <small>{t('От 2 до 63 символов: a-z, 0-9 и дефис.')}</small>
+          {idProblem ? (
+            <small className="field-error" role="alert">
+              {idProblem}
+            </small>
+          ) : (
+            <small>{t('От 2 до 63 символов: a-z, 0-9 и дефис.')}</small>
+          )}
           <label>
             {t('Название')}
             <Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />

@@ -5,10 +5,11 @@ import asyncio
 import httpx2 as httpx
 import pytest
 
-# Cross-component test: needs packages/agent-adapters (installed by the integration workflow, not the unit job).
-Worker = pytest.importorskip("aihub_agents.worker").Worker
-
+from _dbenv import import_worker
 from test_api_integration import admin_token, auth, clean_schema, client, live_server, make_project
+
+# Cross-component test: needs packages/agent-adapters (installed by the integration workflow, not the unit job).
+Worker = import_worker()
 
 pytestmark = pytest.mark.integration
 

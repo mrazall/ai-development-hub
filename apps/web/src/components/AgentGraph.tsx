@@ -14,11 +14,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useEventStream } from '../api/events';
 import type { AgentGraph as AgentGraphData, GraphNode } from '../api/types';
-import { ago, useApi } from '../api/useApi';
+import { useApi } from '../api/useApi';
 import { api, ApiError } from '../api/client';
 import type { SessionEvent } from '../api/types';
 import { ConfirmDialog, ErrorBanner, Loading, StatusBadge } from './ui';
 import { t } from '../i18n';
+import { TimeAgo } from './time';
 
 const FOLD = 'fold:';
 const ROW = 104;
@@ -301,7 +302,14 @@ function AgentDetails({ node, projectId }: { node: GraphNode; projectId: string 
         <dd>{node.duration_s == null ? '—' : t('{0} с', Math.round(node.duration_s))}</dd>
         <dt>{t('Последнее событие')}</dt>
         <dd>
-          {node.latest_event?.kind ?? '—'} {node.latest_event?.ts ? `(${ago(node.latest_event.ts)})` : ''}
+          {node.latest_event?.kind ?? '—'}{' '}
+          {node.latest_event?.ts ? (
+            <>
+              (<TimeAgo value={node.latest_event.ts} />)
+            </>
+          ) : (
+            ''
+          )}
         </dd>
       </dl>
       {isSession && (

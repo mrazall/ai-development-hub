@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ago, useApi } from '../api/useApi';
+import { useApi } from '../api/useApi';
 import { ErrorBanner, Loading, StatusIcon } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 type Check = {
   key: string;
@@ -53,7 +54,7 @@ export function Health(): JSX.Element {
             <StatusIcon value={ICON[report.data.status]} label={LABEL[report.data.status]} />
             <span>{LABEL[report.data.status]}</span>
             <small className="muted">
-              {t('проверено')} {ago(report.data.checked_at)}
+              {t('проверено')} <TimeAgo value={report.data.checked_at} />
             </small>
           </div>
         )}

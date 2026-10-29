@@ -13,6 +13,7 @@ include = ["aihub_agents*"]
 
 [project.scripts]
 aihub-worker = "aihub_agents.worker:main"
+aihub-migrate-profiles = "aihub_agents.migrate_profiles:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

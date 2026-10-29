@@ -1,10 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { api } from '../api/client';
 import type { Worker } from '../api/types';
-import { ago, errorText, useApi } from '../api/useApi';
+import { errorText, useApi } from '../api/useApi';
 import type { User } from '../auth/session';
 import { EmptyState, ErrorBanner, Loading, StatusBadge, Table } from '../components/ui';
 import { t } from '../i18n';
+import { TimeAgo } from '../components/time';
 
 export function Workers({ user }: { user: User }): JSX.Element {
   const workers = useApi<Worker[]>('/workers');
@@ -67,7 +68,9 @@ export function Workers({ user }: { user: User }): JSX.Element {
                     <td>
                       <StatusBadge value={worker.status} />
                     </td>
-                    <td title={worker.last_heartbeat_at ?? ''}>{ago(worker.last_heartbeat_at)}</td>
+                    <td title={worker.last_heartbeat_at ?? ''}>
+                      <TimeAgo value={worker.last_heartbeat_at} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -128,7 +131,7 @@ function RegisterWorker({ onRegistered }: { onRegistered: (worker: Worker) => vo
       </label>
       <label>
         {t('Хост')}
-        <input value={host} onChange={(event) => setHost(event.target.value)} required placeholder="desktop-8eebsn3" />
+        <input value={host} onChange={(event) => setHost(event.target.value)} required placeholder="my-pc" />
       </label>
       <label>
         {t('Тип')}

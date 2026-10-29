@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
-import { useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { useEventStream } from '../api/events';
 import type { Approval, Notification } from '../api/types';
 import { logout } from '../auth/session';
@@ -78,8 +78,8 @@ export function Layout({ user }: { user: User }): JSX.Element {
         <div className="topbar-actions">
           <Link className="notification-link" to="/notifications" aria-label={t('Уведомления')}>
             <Icon name="notifications" />
-            {(unread.data?.length ?? 0) + (approvals.data?.length ?? 0) ? (
-              <b>{(unread.data?.length ?? 0) + (approvals.data?.length ?? 0)}</b>
+            {arrayOrEmpty(unread.data).length + arrayOrEmpty(approvals.data).length ? (
+              <b>{arrayOrEmpty(unread.data).length + arrayOrEmpty(approvals.data).length}</b>
             ) : null}
           </Link>
           <LangToggle />

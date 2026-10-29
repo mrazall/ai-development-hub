@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Project, Session } from '../api/types';
-import { useApi } from '../api/useApi';
+import { arrayOrEmpty, useApi } from '../api/useApi';
 import { StatusIcon, StatusLegend } from './ui';
 import { t } from '../i18n';
 
@@ -9,13 +9,14 @@ export function useProjectStatus(): Map<string, string> {
   const allSessions = useApi<Session[]>('/sessions?limit=1000', { refreshMs: 10_000 });
   return useMemo(() => {
     const byProject = new Map<string, Session[]>();
-    for (const item of allSessions.data ?? [])
+    for (const item of arrayOrEmpty(allSessions.data))
       byProject.set(item.project_id, [...(byProject.get(item.project_id) ?? []), item]);
     const result = new Map<string, string>();
     byProject.forEach((items, id) => {
       const latest = [...items].sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
       if (items.some((item) => ['running', 'starting', 'queued'].includes(item.status))) result.set(id, 'running');
-      else if (['failed', 'offline', 'blocked'].includes(latest.status)) result.set(id, 'failed');
+      else if (['failed', 'offline', 'blocked'].includes(latest.status))
+        result.set(id, latest.acknowledged_at ? 'acknowledged' : 'failed');
       else if (latest.status === 'completed') result.set(id, 'completed');
       else result.set(id, latest.status);
     });

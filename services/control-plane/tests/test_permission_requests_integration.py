@@ -75,3 +75,42 @@ def test_continuation_keeps_or_changes_the_permission_mode(client, admin_token):
     with factory() as db:
         config = db.get(Session, asked["id"]).mcp_config or {}
     assert config.get("user_id") and "knowledge" in config.get("mcpServers", {})
+
+
+def test_feed_of_a_continuation_chain(client, admin_token):  # noqa: F811
+    # The workspace shows a session and its continuations as one conversation: /events?session_ids=a,b.
+    session, _ = _ask_session(client, admin_token, mode="edits")
+    other = client.post("/api/v0/sessions", headers=auth(admin_token), json={
+        "project_id": "demo", "worker_id": "worker-a", "engine": "mock", "provider": "test", "model": "mock",
+        "auth_mode": "local", "workdir": "/tmp/project", "parent_session_id": session["id"],
+    }).json()
+    for sid, text in ((session["id"], "first"), (other["id"], "second")):
+        client.post(f"/api/v0/sessions/{sid}/events", headers=auth(admin_token),
+                    json=[{"kind": "message", "payload": {"role": "user", "text": text}}])
+    feed = client.get(f"/api/v0/events?session_ids={session['id']},{other['id']}&limit=50&newest=true",
+                      headers=auth(admin_token)).json()
+    texts = [event["payload"].get("text") for event in feed if event["kind"] == "message"]
+    assert texts == ["first", "second"]
+
+
+def test_task_follows_its_session(client, admin_token):  # noqa: F811
+    # Found live: every task stayed «draft» although its sessions had run and finished.
+    make_project(client, admin_token)
+    task = client.post("/api/v0/projects/demo/tasks", headers=auth(admin_token),
+                       json={"title": "Почини звонок", "body": "x", "idempotency_key": "k-1"}).json()
+    session = client.post("/api/v0/sessions", headers=auth(admin_token), json={
+        "task_id": task["id"], "project_id": "demo", "worker_id": "worker-a", "engine": "mock", "provider": "test",
+        "model": "mock", "auth_mode": "local", "workdir": "/tmp/project",
+    }).json()
+
+    def status(value):
+        client.post(f"/api/v0/sessions/{session['id']}/events", headers=auth(admin_token),
+                    json=[{"kind": "session.status", "payload": {"status": value}}])
+        return client.get(f"/api/v0/projects/demo/tasks/{task['id']}", headers=auth(admin_token)).json()["status"]
+
+    assert status("starting") == "in_progress"
+    assert status("running") == "in_progress"
+    assert status("completed") == "review"
+    client.patch(f"/api/v0/projects/demo/tasks/{task['id']}", headers=auth(admin_token),
+                 json={"title": "Почини звонок", "body": "x", "status": "done"})
+    assert status("running") == "done"  # the owner's decision stays

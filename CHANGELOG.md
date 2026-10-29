@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Windows desktop installer documentation, a manual-only NSIS build workflow, and a WSL local build script.
+
 ## 0.1.0-alpha — first public release
 
 - Workspace: agent sessions on your own machines (Claude Code, Codex, mock engines) with live output, a shell,

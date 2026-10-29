@@ -12,14 +12,15 @@ from pathlib import Path
 import httpx2 as httpx
 import pytest
 
-Worker = pytest.importorskip("aihub_agents.worker").Worker
-
 from aihub_control.auth import issue_scoped_token
 from aihub_control.config import Settings
 from aihub_control.db import get_session_factory
 from aihub_control.models import AgentEvent, Session, User
 from aihub_control.orchestration.auto_resume import RESUME_TEXT, resume_due
+from _dbenv import import_worker
 from test_api_integration import admin_token, auth, clean_schema, client, live_server, make_project
+
+Worker = import_worker()
 
 pytestmark = pytest.mark.integration
 
@@ -122,9 +123,14 @@ def test_orchestrator_executor_and_owner_approved_merge(client, admin_token, tmp
         db.close()
 
     with live_server() as port:
-        asyncio.run(_run(port, worker["worker_token"], spawned["id"]))
+        events = asyncio.run(_run(port, worker["worker_token"], spawned["id"]))
         branch = spawned["branch"]
         assert "mock-output.txt" in _git(repo, "show", "--stat", "--format=", branch)  # the worker committed it
+        # Found live: the orchestrator saw «completed» before the commit and moved files by hand, and the commit
+        # note was lost (it reused event index 0). The note is in the feed, before the final status.
+        note = next(e for e in events if "закоммичены" in str(e["payload"].get("text", "")))
+        done = next(e for e in events if e["kind"] == "session.status" and e["payload"].get("status") == "completed")
+        assert note["cursor"] < done["cursor"]
         asked = client.post(f"/api/v0/orchestrations/{orchestrator_id}/executors/{spawned['id']}/merge-request",
                             headers=orch, json={"summary": "файл готов"})
         assert asked.status_code == 200 and asked.json()["merge"]["state"] == "requested"
@@ -165,9 +171,13 @@ def test_limit_hit_is_resumed_after_the_reset(client, admin_token, tmp_path):
     db = factory()
     try:
         assert resume_due(db, datetime.now(timezone.utc) + timedelta(days=2)) == 1
-        child = db.query(Session).filter_by(parent_session_id=created["id"]).one()
-        assert child.status == "queued" and child.engine_session_ref == "mock-ref"
-        assert db.query(AgentEvent).filter_by(session_id=child.id, kind="message").one().payload["text"] == RESUME_TEXT
+        # The same session continues (no new session), on the same agent conversation, with the resume note.
+        assert db.query(Session).filter_by(parent_session_id=created["id"]).count() == 0
+        resumed = db.get(Session, created["id"])
+        assert resumed.status == "queued" and resumed.engine_session_ref == "mock-ref" and resumed.resume_at is None
+        texts = [e.payload["text"] for e in db.query(AgentEvent).filter_by(session_id=created["id"], kind="message")
+                 .order_by(AgentEvent.cursor) if e.payload.get("role") == "user"]
+        assert texts[-1] == RESUME_TEXT
     finally:
         db.close()
 

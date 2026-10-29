@@ -82,6 +82,7 @@ export function ChatComposer({
   };
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement; // React clears currentTarget after an await
     if (!text.trim() && files.length === 0) return;
     setBusy(true);
     setError('');
@@ -108,6 +109,8 @@ export function ChatComposer({
       }
       setText('');
       setFiles([]);
+      // Back to one line after a multi-line message.
+      form.querySelector('textarea')?.style.removeProperty('height');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t('Сообщение не отправлено'));
     } finally {
@@ -146,11 +149,24 @@ export function ChatComposer({
           {error}
         </p>
       )}
-      <input
+      <textarea
         aria-label={t('Сообщение агенту')}
-        placeholder={t('Написать агенту… Файл: перетащите или вставьте (Ctrl+V)')}
+        placeholder={t('Написать агенту… Shift+Enter — новая строка')}
+        rows={1}
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => {
+          setText(event.target.value);
+          // Grow with the text up to the CSS max-height, then scroll.
+          event.target.style.height = 'auto';
+          event.target.style.height = `${event.target.scrollHeight}px`;
+        }}
+        onKeyDown={(event) => {
+          // Enter sends, Shift+Enter is a new line; never while an IME is composing a word.
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
         onPaste={(event) => {
           // Screenshots and files copied in a file manager arrive as clipboard files; plain text pastes as usual.
           const pasted = Array.from(event.clipboardData.files);

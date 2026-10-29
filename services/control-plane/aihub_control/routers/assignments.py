@@ -18,13 +18,21 @@ from ..orchestration.notifications import notify_users
 router = APIRouter(tags=["assignments"])
 
 
+def _assignment_config_dir(db, session: Session) -> str | None:
+    if not session.account_profile_id:
+        return None
+    account = db.get(AccountProfile, session.account_profile_id)
+    return account.config_dir if account and account.worker_id == session.worker_id else None
+
+
 # --- Worker subscription status ---
 @router.get("/workers/{worker_id}/accounts")
 def worker_accounts(worker_id: str, principal=Depends(worker_principal), db=Depends(db_dep)):
     if principal.worker_id != worker_id:
         raise HTTPException(403, "worker token is not authorized for this worker")
     return [
-        {"id": account.id, "kind": account.kind, "config_dir": account.config_dir}
+        {"id": account.id, "kind": account.kind, "config_dir": account.config_dir,
+         "login_watch_until": account.login_watch_until}
         for account in db.scalars(
             select(AccountProfile).where(AccountProfile.worker_id == worker_id)
         )
@@ -61,7 +69,11 @@ def assignments(worker_id: str, principal=Depends(worker_principal), db=Depends(
     if principal.worker_id != worker_id:
         raise HTTPException(403, "worker token is not authorized for this worker")
     return [
-        s
+        {
+            **{column.name: getattr(s, column.name) for column in Session.__table__.columns},
+            # The worker must receive the selected profile atomically with the conversation ref.
+            "config_dir": _assignment_config_dir(db, s),
+        }
         for s in db.scalars(
             select(Session)
             .where(Session.worker_id == worker_id, Session.status == "queued")
@@ -98,6 +110,7 @@ def claim(assignment_id: str, principal=Depends(worker_principal), db=Depends(db
         "workdir": session.workdir,
         "branch": session.branch,
         "account_profile_id": session.account_profile_id,
+        "config_dir": _assignment_config_dir(db, session),
         "workspace_ref": session.workspace_ref,
         "title": session.title,
         "engine_session_ref": session.engine_session_ref,
@@ -288,8 +301,10 @@ def next_request(worker_id: str, principal=Depends(worker_principal), db=Depends
         "path": request.path,
         "session_id": request.session_id,
         "workdir": session.workdir if session else None,
-        # Control requests (limits_refresh) carry their parameters here; file requests leave it empty.
-        "response": request.response if request.kind in {"limits_refresh", "git_merge"} else None,
+        # Account control requests also carry their validated account/engine parameters.
+        "response": request.response if request.kind in {
+            "limits_refresh", "git_merge", "account_adopt_login", "account_delete"
+        } else None,
     }
 
 

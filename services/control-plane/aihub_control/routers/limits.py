@@ -15,17 +15,19 @@ def _stale(captured_at: datetime) -> bool:
     return captured_at < datetime.now(timezone.utc) - timedelta(hours=6)
 
 
+def account_limits(account: AccountProfile, db) -> AccountLimitsOut:
+    """Build the public limits payload for one account from stored snapshots."""
+    rows = list(db.scalars(select(AccountLimit).where(AccountLimit.account_id == account.id)))
+    return AccountLimitsOut(account_id=account.id, account_name=account.name, engine=account.kind, windows=[
+        {"kind": row.kind, "used_percent": row.used_percent, "resets_at": row.resets_at,
+         "captured_at": row.captured_at, "stale": _stale(row.captured_at)} for row in rows
+    ])
+
+
 @router.get("", response_model=list[AccountLimitsOut])
 def list_limits(_user=Depends(current_user), db=Depends(db_dep)):
     accounts = list(db.scalars(select(AccountProfile).order_by(AccountProfile.name)))
-    result = []
-    for account in accounts:
-        rows = list(db.scalars(select(AccountLimit).where(AccountLimit.account_id == account.id)))
-        result.append(AccountLimitsOut(account_id=account.id, account_name=account.name, engine=account.kind, windows=[
-            {"kind": row.kind, "used_percent": row.used_percent, "resets_at": row.resets_at,
-             "captured_at": row.captured_at, "stale": _stale(row.captured_at)} for row in rows
-        ]))
-    return result
+    return [account_limits(account, db) for account in accounts]
 
 
 @accounts_router.post("/{account_id}/limits", status_code=204)

@@ -5,6 +5,7 @@ import type { User } from '../auth/session';
 import { ErrorBanner, Loading, StatusBadge } from '../components/ui';
 import { Link } from 'react-router-dom';
 import { ThemeToggle } from '../components/ui';
+import { DesktopApp, inDesktopApp } from '../components/DesktopApp';
 import { t } from '../i18n';
 
 type Health = { status: string; api_version: string; schema_version: number };
@@ -53,6 +54,7 @@ export function Settings({ user }: { user: User }): JSX.Element {
             </dd>
           </dl>
         </section>
+        {inDesktopApp && <DesktopApp username={user.username} />}
         {user.role === 'admin' && <Users />}
       </div>
     </>

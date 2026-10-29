@@ -93,7 +93,10 @@ def test_mock_echo_prompt_exposes_attachment_paths():
     assert ".aihub/attachments/s-1/note.md" in events[1].payload["text"]
 
 
-def test_worker_reports_subscription_file_presence_without_reading_contents(tmp_path):
+def test_worker_reports_subscription_file_presence_without_reading_contents(tmp_path, monkeypatch):
+    # Hermetic: the real `claude`/`codex` may or may not be installed where the tests run. Here the CLI is
+    # unavailable, so only the presence of the credential file (never its contents) decides.
+    monkeypatch.setattr("aihub_agents.worker._cli_identity", lambda kind, path: ("unavailable", None))
     claude_dir = tmp_path / "claude"
     codex_dir = tmp_path / "codex"
     claude_dir.mkdir()
@@ -113,9 +116,10 @@ def test_worker_reports_subscription_file_presence_without_reading_contents(tmp_
 
     worker._request = request
     asyncio.run(worker.check_account_statuses(object()))
-    assert calls[-2:] == [
+    assert calls[-3:] == [
         ("POST", "/api/v0/accounts/claude/status", {"status": "connected"}),
         ("POST", "/api/v0/accounts/codex/status", {"status": "pending_login"}),
+        ("POST", "/api/v0/workers/worker-a/found-logins", {"logins": []}),
     ]
 
 
@@ -147,3 +151,30 @@ def test_event_keys_differ_between_runs_of_the_same_session():
         worker._run_ids["s1"] = __import__("uuid").uuid4().hex[:12]
         asyncio.run(worker._post_event(None, "s1", "s1", 0, {"kind": "output", "payload": {}}))
     assert keys[0] != keys[1] and all(key.startswith("s1:") and key.endswith(":0") for key in keys)
+
+
+def test_worker_trusts_the_cli_when_it_answers(tmp_path, monkeypatch):
+    # The CLI says who is logged in (or that nobody is); a stale credential file does not override it.
+    answers = {"claude_code_subscription": ("pending_login", None),
+               "codex_subscription": ("connected", {"email": "a@example.com"})}
+    monkeypatch.setattr("aihub_agents.worker._cli_identity", lambda kind, path: answers[kind])
+    claude_dir = tmp_path / "claude"
+    claude_dir.mkdir()
+    (claude_dir / ".credentials.json").write_text("stale", encoding="utf-8")
+    worker = Worker("http://control", "worker-a", "token")
+    calls = []
+
+    async def request(_client, method, path, **kwargs):
+        calls.append((method, path, kwargs.get("json")))
+        if method == "GET":
+            return Response(payload=[
+                {"id": "claude", "kind": "claude_code_subscription", "config_dir": str(claude_dir)},
+                {"id": "codex", "kind": "codex_subscription", "config_dir": str(tmp_path / "codex")},
+            ])
+        return Response()
+
+    worker._request = request
+    asyncio.run(worker.check_account_statuses(object()))
+    statuses = {path.split("/")[-2]: body for method, path, body in calls if path.endswith("/status")}
+    assert statuses["claude"] == {"status": "pending_login"}
+    assert statuses["codex"] == {"status": "connected", "identity": {"email": "a@example.com"}}

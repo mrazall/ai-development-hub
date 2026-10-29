@@ -1,4 +1,6 @@
 import asyncio
+import json
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -169,8 +171,35 @@ async def security_and_ticket_middleware(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     if not request.url.path.startswith("/api/"):
         frames = settings.frame_src.strip() or "'none'"
-        response.headers.setdefault("Content-Security-Policy", f"default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src {frames}; frame-ancestors 'none'")
+        response.headers.setdefault("Content-Security-Policy", f"default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src {frames}; frame-ancestors 'none'")
     return response
+
+
+def _desktop_dir() -> Path:
+    return Path(settings.data_dir).expanduser() / "desktop"
+
+
+@app.get("/desktop/latest.json")
+def desktop_latest():
+    """What the desktop app's updater reads. Installers are signed; the app checks the signature itself."""
+    path = _desktop_dir() / "latest.json"
+    if not path.is_file():
+        raise HTTPException(404, "no desktop release")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    base = settings.public_url.rstrip("/")
+    for platform in (data.get("platforms") or {}).values():
+        url = str(platform.get("url", ""))
+        if url and not url.startswith(("https://", "http://")):
+            platform["url"] = f"{base}/desktop/{url}"
+    return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/desktop/{name}")
+def desktop_file(name: str):
+    path = _desktop_dir() / name
+    if not re.fullmatch(r"[\w .()+-]+\.(exe|sig)", name) or not path.is_file():
+        raise HTTPException(404, "not found")
+    return FileResponse(path, filename=name)
 
 
 @app.get("/{path:path}")

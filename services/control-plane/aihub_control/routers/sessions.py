@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 
 import jwt
@@ -12,21 +13,29 @@ from ..config import Settings
 from ..deps import project_or_404
 from sqlalchemy import delete, text
 
-from ..models import AccountProfile, AgentEvent, User, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
+from ..models import AccountProfile, AgentEvent, Task, User, Approval, Attachment, Notification, Project, ProjectMember, Session, WorkerRequest, WorkerToken
 from ..redaction import redact
-from ..schemas import ContinueIn, EventIn, EventOut, PermissionRequestIn, SessionIn, SessionOut, StatusIn
+from ..schemas import ContinueIn, ContinueOnAccountIn, EventIn, EventOut, PermissionRequestIn, SessionIn, SessionOut, StatusIn
 from ..deps import is_admin
 from ..state import validate_transition
 from ..orchestration.notifications import notify_users
 from ..approvals.service import create_from_event, expire_approval
-from ..orchestration.auto_resume import resume_session, schedule_if_limited
+from ..orchestration.auto_resume import CROSS_ACCOUNT_RESUME_MODE, resume_session, schedule_if_limited
 from .chats import _mcp_config
+from .limits import account_limits
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 # A subscription profile is the login of one CLI: Codex started with a Claude profile has no OpenAI login (401).
 ENGINE_OF_ACCOUNT = {"claude_code_subscription": "claude_code", "codex_subscription": "codex"}
+_LOGIN_FILE_PATH = re.compile(r"(?:~|/)[^\s\"']*(?:\.credentials\.json|\.claude\.json|(?:^|/)auth\.json)")
+
+
+def _safe_resume_summary(text: str) -> str:
+    """Keep continuation context useful without copying credentials or login-file paths."""
+    safe, _ = redact(text[:500])
+    return _LOGIN_FILE_PATH.sub("[login file path redacted]", safe)
 
 
 def _check_engine_matches_account(db, engine: str, account_profile_id: str | None) -> None:
@@ -34,6 +43,21 @@ def _check_engine_matches_account(db, engine: str, account_profile_id: str | Non
     expected = ENGINE_OF_ACCOUNT.get(account.kind) if account else None
     if expected and engine != expected and not engine.startswith("mock"):  # mock engines need no login
         raise HTTPException(422, f"аккаунт {account.id} работает только с движком {expected}, выбран {engine}")
+
+
+def _sync_task_status(db, session: Session, status: str) -> None:
+    """A task follows its session: in progress while it runs, in review when it finishes (a person checks the
+    result). «done» and «cancelled» are the owner's and are never overwritten; an orchestrator's executors do
+    not move the shared task. Tasks used to stay «draft» forever."""
+    if not session.task_id or session.role == "executor":
+        return
+    task = db.get(Task, session.task_id)
+    if not task or task.status in {"done", "cancelled"}:
+        return
+    if status in {"starting", "running"} and task.status != "in_progress":
+        task.status = "in_progress"
+    elif status == "completed" and task.status == "in_progress":
+        task.status = "review"
 
 
 @router.post("", response_model=SessionOut)
@@ -159,6 +183,36 @@ def delete_session(session_id: str, user=Depends(write_user), db=Depends(db_dep)
     db.commit()
 
 
+ACKNOWLEDGEABLE = {"failed", "offline", "blocked"}
+
+
+@router.post("/{session_id}/acknowledge", response_model=SessionOut)
+def acknowledge_session(session_id: str, user=Depends(write_user), db=Depends(db_dep)):
+    """«Всё ок»: the owner has seen this failure; it stays failed but is no longer shown as a problem."""
+    session = db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "session not found")
+    project_or_404(db, user, session.project_id)
+    if session.status not in ACKNOWLEDGEABLE:
+        raise HTTPException(409, "only a failed session can be marked as fine")
+    session.acknowledged_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+@router.delete("/{session_id}/acknowledge", response_model=SessionOut)
+def unacknowledge_session(session_id: str, user=Depends(write_user), db=Depends(db_dep)):
+    session = db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "session not found")
+    project_or_404(db, user, session.project_id)
+    session.acknowledged_at = None
+    db.commit()
+    db.refresh(session)
+    return session
+
+
 @router.post("/{session_id}/retry", response_model=SessionOut)
 def retry_session(session_id: str, user=Depends(write_user), db=Depends(db_dep)):
     original = db.get(Session, session_id)
@@ -193,6 +247,54 @@ def continue_session(
         raise HTTPException(409, "у сессии нет ссылки на беседу агента — её нельзя продолжить")
     resumed = resume_session(db, original, data.text, data.attachment_ids, model=data.model, fresh=data.fresh,
                              effort=data.effort, permission_mode=data.permission_mode, user=user)
+    db.commit()
+    db.refresh(resumed)
+    return resumed
+
+
+@router.get("/{session_id}/alternative-accounts")
+def alternative_accounts(session_id: str, user=Depends(current_user), db=Depends(db_dep)):
+    original = db.get(Session, session_id)
+    if not original:
+        raise HTTPException(404, "session not found")
+    project_or_404(db, user, original.project_id)
+    current = db.get(AccountProfile, original.account_profile_id) if original.account_profile_id else None
+    if not current:
+        return []
+    alternatives = db.scalars(select(AccountProfile).where(
+        AccountProfile.worker_id == original.worker_id,
+        AccountProfile.kind == current.kind,
+        AccountProfile.id != current.id,
+        AccountProfile.status != "disabled",
+    ).order_by(AccountProfile.name)).all()
+    return [{
+        "account": a,
+        "limits": (limits if (limits := account_limits(a, db)).windows else None),
+        "resume_mode": CROSS_ACCOUNT_RESUME_MODE,
+    } for a in alternatives]
+
+
+@router.post("/{session_id}/continue-on-account", response_model=SessionOut)
+def continue_on_account(session_id: str, data: ContinueOnAccountIn, user=Depends(write_user), db=Depends(db_dep)):
+    original = db.get(Session, session_id)
+    if not original:
+        raise HTTPException(404, "session not found")
+    project_or_404(db, user, original.project_id)
+    if original.resume_at is None:
+        raise HTTPException(409, "session is not waiting for a provider limit")
+    target = db.get(AccountProfile, data.account_profile_id)
+    current = db.get(AccountProfile, original.account_profile_id) if original.account_profile_id else None
+    if not target or not current or target.id == current.id or target.worker_id != original.worker_id or target.kind != current.kind or target.status == "disabled":
+        raise HTTPException(409, "alternative account is not compatible")
+    recent = db.scalars(select(AgentEvent).where(AgentEvent.session_id == original.id, AgentEvent.kind == "message")
+                        .order_by(AgentEvent.cursor.desc()).limit(8)).all()
+    summary = "Краткая сводка предыдущей беседы:\n" + "\n".join(
+        _safe_resume_summary(str(event.payload.get("text", "")))
+        for event in reversed(recent) if event.payload.get("text"))
+    resume_text = summary if CROSS_ACCOUNT_RESUME_MODE == "summary" else "Лимит восстановился — продолжай с того места, где остановился."
+    resumed = resume_session(db, original, resume_text, user=user, account_profile_id=target.id)
+    db.add(AgentEvent(session_id=original.id, kind="session.account_switched", source="native",
+                      payload={"from": current.id, "to": target.id, "resume_mode": CROSS_ACCOUNT_RESUME_MODE}))
     db.commit()
     db.refresh(resumed)
     return resumed
@@ -269,6 +371,7 @@ def post_events(
                 continue
             session.status = status
             session.status_source = item.source
+            _sync_task_status(db, session, status)
             if item.payload.get("engine_session_ref"):
                 session.engine_session_ref = str(item.payload["engine_session_ref"])
             if item.payload.get("context_tokens") is not None:

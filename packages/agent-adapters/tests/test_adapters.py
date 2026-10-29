@@ -3,6 +3,7 @@ import asyncio
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
 from aihub_agents.adapters import (
@@ -309,3 +310,42 @@ def test_claude_permission_modes(tmp_path):
     assert flags(permission_mode="ask", mcp_config="/tmp/m.json", lean_tools=False) == ("acceptEdits", True, False)
     # Without the MCP server there is nobody to ask: no prompt tool.
     assert flags(permission_mode="ask") == ("acceptEdits", False, False)
+
+
+def test_hub_errors_are_explained():
+    # Found live: after a reboot WSL stopped resolving the hub's tailnet name; the hub only showed "offline".
+    from aihub_agents.worker import describe_hub_error
+
+    hub = "https://hub.example.ts.net"
+    dns = httpx.ConnectError("[Errno -3] Temporary failure in name resolution")
+    assert "cannot resolve hub.example.ts.net" in describe_hub_error(dns, hub)
+    assert "getent hosts hub.example.ts.net" in describe_hub_error(dns, hub)
+    refused = httpx.ConnectError("[Errno 111] Connection refused")
+    assert "refused" in describe_hub_error(refused, hub)
+    timeout = httpx.ConnectTimeout("timed out")
+    assert "does not answer in time" in describe_hub_error(timeout, hub)
+    request = httpx.Request("GET", hub)
+    status = httpx.HTTPStatusError("x", request=request, response=httpx.Response(502, request=request))
+    assert describe_hub_error(status, hub) == f"the hub answered 502 ({hub})"
+
+
+def test_hub_problem_is_logged_once_per_change(capsys):
+    from aihub_agents.worker import Worker
+
+    worker = Worker("https://hub.example.ts.net", "w1", "token")
+    for _ in range(3):
+        worker._note_hub_problem("cannot resolve hub.example.ts.net")
+    worker._note_hub_problem(None)
+    worker._note_hub_problem(None)
+    out = capsys.readouterr().out
+    assert out.count("hub unreachable") == 1 and out.count("hub reachable again") == 1
+
+
+def test_orchestrator_may_use_the_web():
+    # Found live: an orchestrator answered «web tools are unavailable» (WebSearch/WebFetch were not pre-approved).
+    from aihub_agents.adapters import CHAT_TOOLS
+    from aihub_agents.worker import ORCHESTRATOR_TOOLS
+
+    assert {"WebSearch", "WebFetch"} <= set(ORCHESTRATOR_TOOLS)
+    # Everything it is allowed to use is in its (lean) tool set, so nothing is approved but missing.
+    assert set(ORCHESTRATOR_TOOLS) - {"mcp__knowledge"} <= set(CHAT_TOOLS.split())
