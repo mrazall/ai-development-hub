@@ -1,8 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.2.0-alpha — Windows app, accounts, staying signed in
 
-- Windows desktop installer documentation, a manual-only NSIS build workflow, and a WSL local build script.
+- Windows desktop app (Tauri 2): a setup wizard for WSL and the worker, adoption of a worker installed by
+  hand, a tray mark that animates while agents work, double click for the panel, the app's settings inside
+  the panel's settings page. Updates are signed with your key and served by your own hub
+  (`/desktop/latest.json`); the installer attached to this release has updates off until you set a key.
+- Accounts: any number of Claude Code and Codex subscriptions, each in its own profile with shared history;
+  continue a conversation on another account when one hits its limit; the panel shows who is signed in where.
+- Signing in lasts until you sign out or 30 days without use (rotating device tokens in an httpOnly cookie).
+- Sessions: a failed session can be marked «all good» so it stops showing as a problem.
 
 ## 0.1.0-alpha — first public release
 
