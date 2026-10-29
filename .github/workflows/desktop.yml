@@ -43,6 +43,10 @@ jobs:
         working-directory: apps/desktop/src-tauri
         run: cargo test --no-default-features --lib
 
+      - name: Build desktop UI
+        working-directory: apps/desktop/ui
+        run: npm run build
+
       - name: Build NSIS installer
         working-directory: apps/desktop
         run: npx tauri build --bundles nsis
