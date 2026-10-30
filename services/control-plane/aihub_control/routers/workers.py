@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..auth import current_principal, current_user, db_dep, hash_password, worker_principal, write_user
 from ..deps import is_admin, mark_offline
@@ -79,7 +79,17 @@ def heartbeat(
 @router.get("", response_model=list[WorkerOut])
 def workers(user=Depends(current_user), db=Depends(db_dep)):
     mark_offline(db)
-    return list(db.scalars(select(Worker)))
+    active = dict(
+        db.execute(
+            select(Session.worker_id, func.count())
+            .where(Session.status.in_({"starting", "running"}))
+            .group_by(Session.worker_id)
+        ).all()
+    )
+    return [
+        WorkerOut.model_validate(worker).model_copy(update={"active_agents": active.get(worker.id, 0)})
+        for worker in db.scalars(select(Worker))
+    ]
 
 
 @router.post("/{worker_id}/found-logins")

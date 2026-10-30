@@ -1,0 +1,49 @@
+{
+  "total": 2,
+  "items": [
+    {
+      "task_id": "task-a",
+      "title": "Альфа",
+      "project_id": "demo",
+      "status": "done",
+      "agents": 1,
+      "sessions": 1,
+      "runs": 1,
+      "tokens": 1000,
+      "fresh_input": 700,
+      "cache_read": 200,
+      "cache_write": 0,
+      "output": 100,
+      "cost_usd": 1.5,
+      "cost_partial": true,
+      "wall_s": null,
+      "active_s": null,
+      "duration_basis": "unknown",
+      "retries": 1,
+      "orchestrator": { "tokens": 0, "cost_usd": 0 },
+      "executors": { "tokens": 1000, "cost_usd": 1.5 }
+    },
+    {
+      "task_id": "task-b",
+      "title": "Бета",
+      "project_id": "demo",
+      "status": "review",
+      "agents": 1,
+      "sessions": 1,
+      "runs": 1,
+      "tokens": 234,
+      "fresh_input": 200,
+      "cache_read": 0,
+      "cache_write": 0,
+      "output": 34,
+      "cost_usd": null,
+      "cost_partial": true,
+      "wall_s": null,
+      "active_s": null,
+      "duration_basis": "unknown",
+      "retries": 0,
+      "orchestrator": { "tokens": 0, "cost_usd": 0 },
+      "executors": { "tokens": 234, "cost_usd": null }
+    }
+  ]
+}

@@ -24,10 +24,12 @@ class Settings(BaseSettings):
     frame_src: str = ""
     # How the owner opens a shell on a worker machine, shown in CLI login instructions.
     worker_shell_hint: str = ""
+    model_prices: str = ""
     # tailscaled LocalAPI socket (mounted read-only) for the health page; empty = Tailscale not checked.
     tailscale_socket: str = ""
     # How often the health checks run and notify on failures (seconds); 0 = off.
     health_interval_s: int = 60
+    limits_refresh_s: int = 60
     # Demo deployment (quickstart --demo): the panel offers the built-in mock engines and shows a banner.
     demo: bool = False
     # Engine of personal chats; scenario tests set a mock engine (mock_echo_prompt) instead of Claude Code.

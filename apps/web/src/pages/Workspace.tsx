@@ -19,6 +19,7 @@ import type {
 } from '../api/types';
 import type { Attachment } from '../api/types-ops';
 import { arrayOrEmpty, useApi } from '../api/useApi';
+import { CLAUDE_EFFORTS, CLAUDE_MODELS, effortLabel, type WorkerModel } from '../api/models';
 import { DeleteSessionButton } from '../components/DeleteSessionButton';
 import {
   ConfirmDialog,
@@ -39,6 +40,7 @@ import { AttachmentChips, useSessionAttachments } from '../components/attachment
 import { ProjectList, useProjectStatus } from '../components/ProjectPicker';
 import { chatEvents, isPartial, isUserMessage, SessionThreads, useSessionEvents } from '../api/sessionFeed';
 import { Thinking, TimeAgo } from '../components/time';
+import { stepDescription, ToolGroup, toolLabel, type ToolStep } from '../components/ToolGroup';
 import { t } from '../i18n';
 
 const engines = ['claude_code', 'codex', 'opencode'] as const;
@@ -135,16 +137,8 @@ export function Workspace(): JSX.Element {
   };
   const renderSession = (item: Session, group?: { count: number; open: boolean }, child = false) => (
     <div
-      role="button"
-      tabIndex={0}
       className={`session-list-item ${child ? 'session-list-child' : ''} ${selected?.id === item.id ? 'selected' : ''}`}
       key={item.id}
-      onClick={() => openSession(item.id)}
-      onKeyDown={(event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        openSession(item.id);
-      }}
     >
       {group && (
         <button
@@ -162,22 +156,24 @@ export function Workspace(): JSX.Element {
           {group.count}
         </button>
       )}
-      <span>
+      <button type="button" className="session-list-open" onClick={() => openSession(item.id)}>
         <strong>{item.title || item.engine}</strong>
         <small>
           {item.model} · <TimeAgo value={item.updated_at} />
           {(threads.chains.get(item.id)?.length ?? 1) > 1 &&
             t(' · продолжений: {0}', (threads.chains.get(item.id)?.length ?? 1) - 1)}
         </small>
+      </button>
+      <span className="session-list-actions">
+        <StatusIcon value={sessionStatus(item.id === selected?.id ? selected : item)} />
+        <DeleteSessionButton
+          session={item.id === selected?.id ? selected : item}
+          onDeleted={() => {
+            if (item.id === selected?.id) setParams({ project: projectId });
+            sessions.reload();
+          }}
+        />
       </span>
-      <StatusIcon value={sessionStatus(item.id === selected?.id ? selected : item)} />
-      <DeleteSessionButton
-        session={item.id === selected?.id ? selected : item}
-        onDeleted={() => {
-          if (item.id === selected?.id) setParams({ project: projectId });
-          sessions.reload();
-        }}
-      />
     </div>
   );
   return (
@@ -587,8 +583,12 @@ function durationLabel(session: Session): string {
 function ChatFeed({ sessionId, status }: { sessionId: string; status?: string }): JSX.Element {
   const all = useSessionEvents(sessionId, 200, 'chat');
   const attachments = useSessionAttachments(sessionId);
-  // The chat is the conversation: commands and their output live in the Agent and Events tabs.
-  const events = useMemo(() => chatEvents(all).filter((event) => !event.kind.startsWith('tool.')), [all]);
+  // The chat is the conversation: tool calls fold into one line per run of steps; full results and raw output
+  // live in the Agent and Events tabs.
+  const events = useMemo(() => chatEvents(all).filter((event) => event.kind !== 'tool.result'), [all]);
+  const running = status === 'running' || status === 'starting';
+  // While a run of steps is the last thing (statuses aside), its own line shows the work: no second spinner.
+  const lastSaid = [...events].reverse().find((event) => event.kind !== 'session.status');
   // Like the Claude app: follow new messages while the reader is at the bottom, leave them alone otherwise.
   const feedRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
@@ -609,11 +609,13 @@ function ChatFeed({ sessionId, status }: { sessionId: string; status?: string })
   return (
     <div className="chat-feed" ref={feedRef}>
       {events.length ? (
-        <SessionTimeline events={events} sessionId={sessionId} attachments={attachments} />
+        <SessionTimeline events={events} sessionId={sessionId} attachments={attachments} running={running} />
       ) : (
         <p className="muted">{t('Сообщений пока нет.')}</p>
       )}
-      {status && WORKING[status] && <Thinking label={WORKING[status]} since={turnStart(all, status)} />}
+      {status && WORKING[status] && !(running && lastSaid?.kind === 'tool.call') && (
+        <Thinking label={WORKING[status]} since={turnStart(all, status)} />
+      )}
       <QuoteSelection container={feedRef} />
     </div>
   );
@@ -642,17 +644,67 @@ function eventIdentity(event: SessionEvent): string | null {
   return null;
 }
 
+function toolStep(call: SessionEvent, result?: SessionEvent): ToolStep {
+  const description = stepDescription(call.payload.command);
+  const name = typeof call.payload.name === 'string' ? call.payload.name : String(call.payload.tool ?? '');
+  const command = call.payload.command;
+  // The command, path or query itself (Bash, Read, Grep, WebFetch…); the whole input only when it is richer.
+  const fields = command && typeof command === 'object' ? (command as Record<string, unknown>) : {};
+  const meaningful = Object.keys(fields).filter(
+    (key) => !['description', 'timeout', 'run_in_background'].includes(key),
+  );
+  const main = ['command', 'file_path', 'path', 'pattern', 'url', 'query'].find(
+    (key) => typeof fields[key] === 'string',
+  );
+  const input =
+    typeof command === 'string'
+      ? command
+      : main && meaningful.length <= 2
+        ? String(fields[main])
+        : command
+          ? JSON.stringify(command, null, 2)
+          : '';
+  return {
+    key: call.cursor,
+    label: description || toolLabel(name),
+    at: call.ts,
+    failed: typeof result?.payload.exit_code === 'number' && result.payload.exit_code !== 0,
+    detail: (
+      <>
+        {input && <pre>{input}</pre>}
+        {result && <pre>{eventText(result)}</pre>}
+      </>
+    ),
+  };
+}
+
 function SessionTimeline({
   events,
   sessionId,
   attachments,
+  running = false,
 }: {
   events: SessionEvent[];
   sessionId: string;
   attachments: Attachment[];
+  running?: boolean;
 }): JSX.Element {
   const rows: JSX.Element[] = [];
   const consumed = new Set<number>();
+  // Consecutive tool calls become one line (like Claude Code); it closes when anything else is said.
+  let steps: ToolStep[] = [];
+  // Status changes in the middle of a run of steps (reconnects, "running" again) do not split it: they are shown
+  // right after the group.
+  let deferred: JSX.Element[] = [];
+  const closeGroup = (next?: SessionEvent) => {
+    if (steps.length)
+      rows.push(
+        <ToolGroup key={`tools-${steps[0].key}`} steps={steps} running={running && !next} endedAt={next?.ts} />,
+      );
+    rows.push(...deferred);
+    steps = [];
+    deferred = [];
+  };
   events.forEach((event, index) => {
     if (consumed.has(event.cursor)) return;
     if (event.kind === 'tool.call') {
@@ -661,9 +713,14 @@ function SessionTimeline({
         .slice(index + 1)
         .find((candidate) => candidate.kind === 'tool.result' && (!identity || eventIdentity(candidate) === identity));
       if (result) consumed.add(result.cursor);
-      rows.push(<ToolCard key={event.cursor} call={event} result={result} />);
+      steps.push(toolStep(event, result));
       return;
     }
+    if (event.kind === 'session.status' && steps.length) {
+      deferred.push(<SessionStatusRow key={event.cursor} event={event} />);
+      return;
+    }
+    closeGroup(event);
     if (event.kind === 'tool.result') {
       rows.push(<ToolCard key={event.cursor} result={event} />);
       return;
@@ -718,6 +775,7 @@ function SessionTimeline({
       );
     }
   });
+  closeGroup();
   return <>{rows}</>;
 }
 
@@ -931,7 +989,9 @@ function NewSessionDialog({
     executor_account_profile_id: '',
     executor_model: 'gpt-5.6-luna',
     permission_mode: 'edits',
+    effort: '',
   });
+  const [customModel, setCustomModel] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [attachError, setAttachError] = useState('');
   // Picked or pasted files add up (same limits as the session composer); they upload when the session starts.
@@ -949,9 +1009,11 @@ function NewSessionDialog({
   };
   const [manualMerge, setManualMerge] = useState(false);
   const [error, setError] = useState('');
-  const account = accountList.find((item) => item.id === form.account_profile_id);
-  const orchestratorAccounts = accountList.filter((item) => item.kind === 'claude_code_subscription');
-  const executorAccounts = accountList.filter((item) => item.kind === 'codex_subscription');
+  // Only accounts signed in on the chosen worker: a login lives in a profile folder on that machine.
+  const workerAccounts = accountList.filter((item) => item.worker_id === form.worker_id && item.status === 'connected');
+  const account = workerAccounts.find((item) => item.id === form.account_profile_id);
+  const orchestratorAccounts = workerAccounts.filter((item) => item.kind === 'claude_code_subscription');
+  const executorAccounts = workerAccounts.filter((item) => item.kind === 'codex_subscription');
   const selectedProject = projects.find((item) => item.id === form.project_id);
   const models = account?.models ?? [];
   const selectedWorker = useApi<WorkerDetails>(
@@ -960,6 +1022,34 @@ function NewSessionDialog({
   const availableEngines = Object.keys(selectedWorker.data?.capabilities ?? {}).filter((engine) =>
     engines.includes(engine as (typeof engines)[number]),
   );
+  // Models of the engine that runs: Codex reports its own list (with effort levels) through the worker;
+  // Claude Code has a fixed family. A profile's own models and default are offered too.
+  const codexModels = selectedWorker.data?.models?.codex ?? [];
+  const modelEngine = form.mode === 'orchestrated' ? 'claude_code' : form.engine;
+  const modelChoices: WorkerModel[] = (() => {
+    const known: WorkerModel[] =
+      modelEngine === 'codex'
+        ? codexModels
+        : modelEngine === 'claude_code'
+          ? CLAUDE_MODELS.map(([slug, name]) => ({ slug, name, efforts: CLAUDE_EFFORTS }))
+          : [];
+    const extra = [account?.default_model, ...models]
+      .filter((slug): slug is string => Boolean(slug) && !known.some((item) => item.slug === slug))
+      .map((slug) => ({ slug, name: slug, efforts: modelEngine === 'claude_code' ? CLAUDE_EFFORTS : [] }));
+    return [...known, ...extra];
+  })();
+  const chosenModel = modelChoices.find((item) => item.slug === form.model);
+  const efforts = chosenModel?.efforts.length
+    ? chosenModel.efforts
+    : modelEngine === 'claude_code'
+      ? CLAUDE_EFFORTS
+      : modelEngine === 'codex'
+        ? [...new Set(codexModels.flatMap((item) => item.efforts))]
+        : [];
+  useEffect(() => {
+    // A model that does not offer the chosen effort falls back to its default.
+    if (form.effort && !efforts.includes(form.effort)) update('effort', '');
+  }, [efforts.join(','), form.effort]);
   const info = useApi<{ demo: boolean }>('/system/info');
   const engineOptions = info.data?.demo ? MOCK_ENGINES : availableEngines.length ? availableEngines : [...engines];
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -986,12 +1076,17 @@ function NewSessionDialog({
       if (online) update('worker_id', online.id);
     }
   }, [form.worker_id, workerList]);
+  // A new worker (or the first load) takes one of its own accounts; an account of another worker never stays
+  // selected. "Without a profile" chosen on purpose is kept.
+  const accountsWorker = useRef('');
   useEffect(() => {
-    if (!form.account_profile_id && accountList.length) {
-      const matching = accountList.find((item) => item.worker_id === form.worker_id && item.status === 'connected');
-      if (matching) update('account_profile_id', matching.id);
-    }
-  }, [accountList, form.account_profile_id, form.worker_id]);
+    if (form.mode === 'orchestrated' || !accountList.length) return;
+    const ids = workerAccounts.map((item) => item.id);
+    const workerChanged = accountsWorker.current !== form.worker_id;
+    accountsWorker.current = form.worker_id;
+    if (workerChanged || (form.account_profile_id && !ids.includes(form.account_profile_id)))
+      update('account_profile_id', ids[0] ?? '');
+  }, [form.worker_id, workerAccounts.map((item) => item.id).join(','), form.account_profile_id, form.mode]);
   useEffect(() => {
     if (form.mode === 'orchestrated') {
       if (!orchestratorAccounts.some((item) => item.id === form.account_profile_id))
@@ -1078,6 +1173,7 @@ function NewSessionDialog({
           auth_mode: account?.kind?.includes('subscription') ? 'subscription' : 'api_key',
           workdir: selectedProject?.allowed_paths?.[0] || '/',
           branch: form.branch || null,
+          effort: form.effort || null,
           title,
           hold: attachments.length > 0,
         }),
@@ -1151,13 +1247,11 @@ function NewSessionDialog({
               onChange={(event) => update('account_profile_id', event.target.value)}
             >
               <option value="">{t('без профиля')}</option>
-              {(form.mode === 'orchestrated' ? orchestratorAccounts : accountList)
-                .filter((item) => !form.worker_id || item.worker_id === form.worker_id)
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} · {item.status}
-                  </option>
-                ))}
+              {(form.mode === 'orchestrated' ? orchestratorAccounts : workerAccounts).map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
             </select>
           </label>
         )}
@@ -1172,7 +1266,7 @@ function NewSessionDialog({
               >
                 {executorAccounts.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} · {item.status}
+                    {item.name}
                   </option>
                 ))}
               </select>
@@ -1187,7 +1281,22 @@ function NewSessionDialog({
             </label>
             <label>
               {t('Модель исполнителей')}
-              <input value={form.executor_model} onChange={(event) => update('executor_model', event.target.value)} />
+              {codexModels.length ? (
+                <select value={form.executor_model} onChange={(event) => update('executor_model', event.target.value)}>
+                  {[
+                    ...codexModels,
+                    ...(codexModels.some((item) => item.slug === form.executor_model)
+                      ? []
+                      : [{ slug: form.executor_model, name: form.executor_model }]),
+                  ].map((item) => (
+                    <option key={item.slug} value={item.slug}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input value={form.executor_model} onChange={(event) => update('executor_model', event.target.value)} />
+              )}
             </label>
             <label className="checkbox-row">
               <input type="checkbox" checked={manualMerge} onChange={(event) => setManualMerge(event.target.checked)} />
@@ -1197,18 +1306,51 @@ function NewSessionDialog({
         )}
         <label>
           {t('Модель')}
-          <input
-            list="available-models"
-            value={form.model}
-            onChange={(event) => update('model', event.target.value)}
-            placeholder={account?.default_model || t('Введите модель вручную')}
-          />
-          <datalist id="available-models">
-            {models.map((model) => (
-              <option key={model} value={model} />
+          <select
+            value={customModel ? '__custom__' : form.model}
+            onChange={(event) => {
+              const custom = event.target.value === '__custom__';
+              setCustomModel(custom);
+              update('model', custom ? '' : event.target.value);
+            }}
+          >
+            <option value="">
+              {account?.default_model ? t('По умолчанию ({0})', account.default_model) : t('По умолчанию для аккаунта')}
+            </option>
+            {modelChoices.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.name}
+              </option>
             ))}
-          </datalist>
+            <option value="__custom__">{t('Другая модель…')}</option>
+          </select>
+          {customModel && (
+            <input
+              autoFocus
+              value={form.model}
+              onChange={(event) => update('model', event.target.value)}
+              placeholder={t('Введите модель вручную')}
+              aria-label={t('Модель вручную')}
+            />
+          )}
         </label>
+        {efforts.length > 0 && !form.engine.startsWith('mock') && (
+          <label>
+            {t('Усилие')}
+            <select value={form.effort} onChange={(event) => update('effort', event.target.value)}>
+              <option value="">
+                {chosenModel?.default_effort
+                  ? t('По умолчанию ({0})', effortLabel(chosenModel.default_effort))
+                  : t('По умолчанию')}
+              </option>
+              {efforts.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effortLabel(effort)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {form.mode === 'single' && (
           <label>
             {t('Движок')}

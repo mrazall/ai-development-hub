@@ -10,7 +10,11 @@ from ..models import AccountLimit, AgentEvent, Attachment, Session
 RESUME_TEXT = "Лимит восстановился — продолжай с того места, где остановился."
 CROSS_ACCOUNT_RESUME_MODE = "native"
 # Claude: "You've hit your session limit · resets 12am (Europe/Moscow)"; Codex: "You've hit your usage limit".
-LIMIT_RE = re.compile(r"hit your (session|weekly|usage|opus|five.hour)? ?limit|usage limit reached|rate limit reached", re.IGNORECASE)
+# Any window name: "session", "weekly", "Opus", "5-hour"… (the CLI renamed them over time).
+LIMIT_RE = re.compile(
+    r"you(?:'|’)?ve hit your (?:[\w.-]+ ){0,2}limit|you have hit your (?:[\w.-]+ ){0,2}limit|usage limit reached|rate limit reached",
+    re.IGNORECASE,
+)
 RESETS_RE = re.compile(r"resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:\(([^)]+)\))?", re.IGNORECASE)
 DEFAULT_TZ = "Europe/Moscow"
 # The reset moment is approximate: give the provider a little slack and never retry in a tight loop.
@@ -81,9 +85,11 @@ def schedule_if_limited(db, session: Session, now: datetime | None = None) -> da
 
 
 def resume_session(db, original: Session, text: str, attachment_ids=None, model=None, fresh=False, effort=None,
-                   permission_mode=None, user=None, account_profile_id=None) -> Session:
+                   permission_mode=None, user=None, account_profile_id=None, trigger=None) -> Session:
     """Continue a finished session in place: the same session runs again on the same agent conversation (the
     owner opens a new session when they want one). Personal chats keep a child per message (chat_id threads)."""
+    from ..analytics.runs import create_run
+    trigger = trigger or ("retry_after_failure" if original.status == "failed" and original.resume_at is None else "continue")
     original.resume_at = None
     if not original.chat_id:
         if model:
@@ -102,7 +108,8 @@ def resume_session(db, original: Session, text: str, attachment_ids=None, model=
                 original.mcp_config = {**(original.mcp_config or {}), "mcpServers": _mcp_config()["mcpServers"], "user_id": owner_id}
         original.status = "queued"
         original.status_source = "native"
-        db.add(AgentEvent(session_id=original.id, kind="session.status", source="native", payload={"status": "queued", "reason": "продолжение"}))
+        run = create_run(db, original, trigger)
+        db.add(AgentEvent(session_id=original.id, run_id=run.id, kind="session.status", source="native", payload={"status": "queued", "reason": "продолжение"}))
         db.add(AgentEvent(
             session_id=original.id, kind="message", source="native",
             payload={"role": "user", "text": text, "attachment_ids": attachment_ids or []},
@@ -139,6 +146,7 @@ def resume_session(db, original: Session, text: str, attachment_ids=None, model=
             child.mcp_config = {**(child.mcp_config or {}), "mcpServers": _mcp_config()["mcpServers"], "user_id": owner_id}
     db.add(child)
     db.flush()
+    create_run(db, child, trigger)
     # The composer uploads files to the session on screen (the finished one); the continuation is a new
     # session and the worker fetches only that session's attachments: move them over.
     for attachment_id in (attachment_ids or [])[:10]:
@@ -161,7 +169,7 @@ def resume_due(db, now: datetime | None = None) -> int:
         if session.status in {"completed", "failed", "offline"}:
             # Automatic resume is deliberately account-sticky.  Changing an account is
             # only allowed through the explicit continue-on-account user action.
-            resume_session(db, session, RESUME_TEXT, account_profile_id=None)
+            resume_session(db, session, RESUME_TEXT, account_profile_id=None, trigger="auto_resume")
         else:
             session.resume_at = None  # someone already woke it up
     db.commit()

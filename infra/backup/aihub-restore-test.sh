@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo="${AIHUB_RESTIC_REPOSITORY:-/srv/media/restic-aihub}"
+repo="${AIHUB_RESTIC_REPOSITORY:-/srv/media2/restic-aihub}"
 password_file="${AIHUB_RESTIC_PASSWORD_FILE:-$HOME/ai-dev-hub/secrets/restic-aihub-password}"
 compose_file="${AIHUB_COMPOSE_FILE:-infra/docker-compose.yml}"
 compose_project="${AIHUB_COMPOSE_PROJECT:-aihub}"

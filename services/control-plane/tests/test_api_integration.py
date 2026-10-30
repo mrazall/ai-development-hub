@@ -215,6 +215,18 @@ def test_worker_token_scope_and_offline_session(client, admin_token):
     assert beat.status_code == 200
     assert client.get(f"/api/v0/sessions/{session['id']}", headers=auth(admin_token)).json()["status"] == "running"
     assert client.get(f"/api/v0/sessions/{foreign_session['id']}", headers=auth(admin_token)).json()["status"] != "running"
+    # The desktop app animates its tray while the worker has running sessions (lease back, or the
+    # listing marks worker-a offline again).
+    db = factory()
+    db.query(Worker).filter_by(id="worker-a").one().lease_ttl_s = 60
+    db.commit()
+    db.close()
+    client.post("/api/v0/workers/worker-a/heartbeat", headers=worker_headers, json={"active_sessions": [session["id"]]})
+    counts = {w["id"]: w["active_agents"] for w in client.get("/api/v0/workers", headers=auth(admin_token)).json()}
+    assert counts == {"worker-a": 1, "worker-b": 0}
+    # The session page's worker strip: status and last heartbeat, even before the worker sent capabilities.
+    details = client.get("/api/v0/workers/worker-a", headers=auth(admin_token)).json()
+    assert details["id"] == "worker-a" and details["status"] == "online" and details["last_heartbeat_at"]
     assert other_worker["worker_token"]
 
 
@@ -428,8 +440,10 @@ def test_events_chat_filter_keeps_the_conversation_only(client, admin_token):
     ])
     page = client.get(f"/api/v0/events?session_id={session['id']}&limit=50&newest=true&chat=true",
                       headers=auth(admin_token)).json()
+    # Tool calls are part of the chat (folded into one line per run of steps); output and partials are not.
     assert [(event["kind"], event["payload"].get("text")) for event in page] == [
         ("message", "вопрос"),
+        ("tool.call", None),
         ("message", "ответ"),
     ]
     activity = client.get(f"/api/v0/events?session_id={session['id']}&limit=50&newest=true&view=activity",

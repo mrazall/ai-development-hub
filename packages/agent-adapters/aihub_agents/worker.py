@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import getpass
 import json
 import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import tempfile
 import time
@@ -29,6 +31,7 @@ from .adapters import (
 )
 from .mcp_config import write_claude_session_config, write_session_config
 from .rate_limits import latest_codex_rollout_rate_limits
+from .usage_probe import probe_limits
 from .workspace import (
     commit_worktree,
     execute_request,
@@ -42,12 +45,14 @@ from .workspace import (
 class Worker:
     def __init__(
         self, control_plane: str, worker_id: str, token: str, codeman_url: str | None = None,
-        enabled_engines: set[str] | None = None, max_session_seconds: int = 3600
+        enabled_engines: set[str] | None = None, max_session_seconds: int = 86400
     ):
         self.base = control_plane.rstrip("/")
         self.worker_id, self.token, self.codeman_url = worker_id, token, codeman_url
         self.enabled_engines = enabled_engines or set()
         self.max_session_seconds = max_session_seconds
+        self._limits_lock = asyncio.Lock()
+        self._background: set[asyncio.Task] = set()
         self.headers = {"Authorization": f"Bearer {token}"}
         self._active_adapters: set[Any] = set()
         self._active_sessions: set[str] = set()
@@ -120,7 +125,7 @@ class Worker:
         for name, stream in engines.items():
             if stream:
                 versions[name] = (await stream.read()).decode(errors="replace").strip()[:200]
-        payload = {"engines": versions}
+        payload = {"engines": versions, "shell_hint": shell_hint(), "models": {"codex": codex_models()}}
         if self.codeman_url:
             payload["workspace_url"] = self.codeman_url
         async with httpx.AsyncClient() as client:
@@ -294,7 +299,10 @@ class Worker:
             return
         request = response.json()
         if request.get("kind") == "limits_refresh":
-            await self._refresh_limits(client, request)
+            # 10–20 s of a CLI in a pseudo-terminal: in the background, one at a time, so sessions start meanwhile.
+            task = asyncio.create_task(self._refresh_limits_serially(client, request))
+            self._background.add(task)
+            task.add_done_callback(self._background.discard)
             return
         try:
             if request.get("kind") == "account_adopt_login":
@@ -343,8 +351,12 @@ class Worker:
             headers=self.headers, json=payload,
         )
 
+    async def _refresh_limits_serially(self, client: httpx.AsyncClient, request: dict[str, Any]) -> None:
+        async with self._limits_lock:
+            await self._refresh_limits(client, request)
+
     async def _refresh_limits(self, client: httpx.AsyncClient, request: dict[str, Any]) -> None:
-        """Run the explicitly requested, minimal subscription probe and always answer the request."""
+        """Read the account's limits on request (without a model call) and always answer the request."""
         payload = request.get("response") or {}
         account_id = payload.get("account_id")
         result: dict[str, Any] = {"error": "account id missing"}
@@ -356,32 +368,17 @@ class Worker:
                 result = {"error": "account unavailable"}
             else:
                 account = account_response.json()
-                kind = account.get("kind")
-                adapter: EngineAdapter | None = None
-                if kind == "claude_code_subscription":
-                    adapter = ClaudeCodeAdapter(account.get("config_dir"), prompt="ok", max_turns=1, disable_tools=True)
-                elif kind == "codex_subscription":
-                    adapter = CodexExecAdapter(account.get("config_dir"), prompt="ok")
-                if adapter is None:
-                    result = {"error": f"unsupported account kind {kind}"}
+                # The CLI's own /usage (Claude) or /status (Codex) in a pseudo-terminal: nothing reaches the
+                # model, so checking limits does not spend them.
+                windows, screen = await probe_limits(account.get("kind", ""), account.get("config_dir"))
+                if windows:
+                    posted = await self._request(
+                        client, "POST", f"/api/v0/accounts/{account_id}/limits", headers=self.headers,
+                        json={"captured_at": datetime.now(UTC).isoformat(), "windows": windows},
+                    )
+                    result = {"windows": len(windows), "status": None if posted is None else posted.status_code}
                 else:
-                    tail: list[str] = []
-                    started = time.time()
-                    async for event in adapter.start():
-                        if event.kind == "output":
-                            tail = (tail + [str(event.payload.get("text", ""))[:200]])[-3:]
-                    windows = getattr(adapter, "rate_limits", None) or []
-                    if not windows and kind == "codex_subscription":
-                        # Codex keeps them in its own rollout journal, not in `exec --json` output.
-                        windows = latest_codex_rollout_rate_limits(_codex_base_home(account.get("config_dir")), started)
-                    if windows:
-                        posted = await self._request(
-                            client, "POST", f"/api/v0/accounts/{account_id}/limits", headers=self.headers,
-                            json={"captured_at": datetime.now(UTC).isoformat(), "windows": windows},
-                        )
-                        result = {"windows": len(windows), "status": None if posted is None else posted.status_code}
-                    else:
-                        result = {"error": "CLI reported no rate limits", "tail": tail}
+                    result = {"error": "CLI showed no limits", "tail": screen.splitlines()[-3:]}
         except Exception as exc:  # noqa: BLE001 - reported back instead of silently stalling the request
             result = {"error": f"{type(exc).__name__}: {str(exc)[:300]}"}
         await self._request(
@@ -502,7 +499,9 @@ class Worker:
                         write_claude_session_config,
                         session_mcp_dir,
                         session["mcp_config"],
-                        str(session.get("hub_url") or ""),
+                        # The address this worker itself reaches the hub at (like Codex below): the hub's public
+                        # URL may not resolve on the worker's machine (the hub host itself, a tailnet name).
+                        self.base,
                         str(session.get("knowledge_token") or ""),
                         token_file=session_token_file,
                         orchestrator_session=session["id"] if session.get("role") == "orchestrator" else None,
@@ -551,7 +550,9 @@ class Worker:
             MockAdapter(scenario, prompt, workdir=workdir)
             if engine.startswith("mock")
             else (
-                CodexExecAdapter(config_dir, workdir, session.get("model"), prompt, resume=continuation_ref)
+                CodexExecAdapter(config_dir, workdir, session.get("model"), prompt, resume=continuation_ref,
+                                 writable_roots=git_common_dirs(workdir),
+                                 effort=(session.get("mcp_config") or {}).get("effort"))
                 if session.get("engine") == "codex"
                 else ClaudeCodeAdapter(
                     config_dir, workdir, session.get("model"), prompt,
@@ -1437,11 +1438,67 @@ def should_compact_claude(context_tokens: int | None, fresh: bool, limit: int | 
     return context_tokens >= configured
 
 
-def session_timeout_seconds(session: dict[str, Any], default: int = 3600) -> int:
+def git_common_dirs(workdir: str | Path | None) -> list[str]:
+    """The repository's .git (shared by its worktrees): Codex keeps any .git read-only unless it is named."""
+    if not workdir:
+        return []
+    try:
+        common = subprocess.run(
+            ["git", "-C", str(workdir), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [common] if common else []
+
+
+def codex_models() -> list[dict[str, Any]]:
+    """The models Codex offers in /model, from its own cache in a profile: slug, name, effort levels, default."""
+    homes = sorted(Path.home().glob(".aihub/accounts/*/codex/models_cache.json")) + [Path.home() / ".codex/models_cache.json"]
+    for path in homes:
+        try:
+            models = json.loads(path.read_text(encoding="utf-8")).get("models") or []
+        except (OSError, ValueError, AttributeError):
+            continue
+        listed = [
+            {"slug": m["slug"], "name": m.get("display_name") or m["slug"],
+             "efforts": [level.get("effort") for level in m.get("supported_reasoning_levels") or [] if level.get("effort")],
+             "default_effort": m.get("default_reasoning_level")}
+            for m in models if isinstance(m, dict) and m.get("slug") and m.get("visibility", "list") == "list"
+        ]
+        if listed:
+            return listed[:40]
+    return []
+
+
+def shell_hint() -> str | None:
+    """How the owner opens a terminal as this worker's user: WSL from Windows, otherwise ssh to this host.
+
+    AIHUB_SHELL_HINT overrides it. A systemd service in WSL does not see WSL_DISTRO_NAME unless the unit sets
+    it (setup-worker.sh does); without it the hint uses the default distro.
+    """
+    if os.environ.get("AIHUB_SHELL_HINT"):
+        return os.environ["AIHUB_SHELL_HINT"]
+    user = os.environ.get("USER") or getpass.getuser()
+    try:
+        in_wsl = "microsoft" in Path("/proc/sys/kernel/osrelease").read_text().lower()
+    except OSError:
+        in_wsl = False
+    if in_wsl:
+        distro = os.environ.get("WSL_DISTRO_NAME")
+        return f"wsl -d {distro} -u {user}" if distro else f"wsl -u {user}"
+    return f"ssh -t {user}@{socket.gethostname()}"
+
+
+# A run may take up to a day (long owner tasks); the limit only catches a run that hangs.
+MAX_RUN_SECONDS = 86400
+
+
+def session_timeout_seconds(session: dict[str, Any], default: int = MAX_RUN_SECONDS) -> int:
     if session.get("role") == "orchestrator":
-        configured = int(os.environ.get("AIHUB_ORCHESTRATOR_MAX_SECONDS", "14400"))
-        return min(max(configured, 1), 14400)
-    return max(int(default), 1)
+        configured = int(os.environ.get("AIHUB_ORCHESTRATOR_MAX_SECONDS", str(MAX_RUN_SECONDS)))
+        return min(max(configured, 1), MAX_RUN_SECONDS)
+    return min(max(int(default), 1), MAX_RUN_SECONDS)
 
 
 def write_token_file(path: str | Path, token: str) -> None:
@@ -1472,7 +1529,7 @@ def main() -> None:
     parser.add_argument("--token-file", required=True)
     parser.add_argument("--codeman-url")
     parser.add_argument("--enable-engines", default="", help="comma-separated real engines")
-    parser.add_argument("--max-session-seconds", type=int, default=3600)
+    parser.add_argument("--max-session-seconds", type=int, default=86400)
     args = parser.parse_args()
     token = Path(args.token_file).read_text().strip()
     enabled = {item.strip() for item in args.enable_engines.split(",") if item.strip()}

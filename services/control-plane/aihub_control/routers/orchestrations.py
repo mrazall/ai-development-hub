@@ -172,6 +172,9 @@ def spawn(orchestrator_id: str, data: ExecutorCreateIn, user=Depends(_scope), db
     child = Session(task_id=parent.task_id, project_id=parent.project_id, worker_id=config["executor_worker_id"], engine="codex", provider="openai", model=config.get("executor_model", "gpt-5.6-luna"), auth_mode="subscription", workdir=workdir, branch=branch, parent_session_id=parent.id, account_profile_id=config.get("executor_account_profile_id"), title=data.title, role="executor", status="queued", orchestration={"base_workdir": config.get("base_workdir"), "base_branch": config.get("base_branch", "main")}, mcp_config={"user_id": user.id, "AIHUB_ORCH_SESSION": parent.id})
     db.add(child)
     db.flush()
+    from ..analytics.runs import create_run, latest_run
+    previous = latest_run(db, source.id) if data.reuse_branch_of else None
+    create_run(db, child, ("retry_after_failure" if previous and previous.status == "failed" else "rework") if data.reuse_branch_of else "initial")
     db.add(AgentEvent(session_id=child.id, kind="message", source="native", payload={"role": "user", "text": data.prompt}))
     db.commit()
     db.refresh(child)

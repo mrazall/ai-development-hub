@@ -6,7 +6,7 @@ import { t } from '../i18n';
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 const bridge = (window as unknown as { __TAURI_INTERNALS__?: { invoke: Invoke } }).__TAURI_INTERNALS__;
 export const inDesktopApp = Boolean(bridge?.invoke);
-const call: Invoke = (command, args) => bridge!.invoke(command, args);
+export const call: Invoke = (command, args) => bridge!.invoke(command, args);
 
 type AppStatus = { hubReachable: boolean; workerState: string; activeAgents: number; warning?: string | null };
 type AppSettings = { autostart: boolean; workerId?: string | null };

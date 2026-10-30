@@ -1,12 +1,12 @@
 /* settings-mobile — owned by one executor; uses only Monochrome Signal tokens from style.css. */
 
-/* The settings family contains long provider URLs, fingerprints and worker hosts.
-   Keep overflow local to the data surface; the application shell must never grow. */
+/* Long provider URLs and fingerprints wrap or scroll in their own data surfaces. The
+   document is deliberately not clipped here: clipping would hide shell regressions. */
 html,
 body,
 #root {
   max-width: 100%;
-  overflow-x: hidden;
+  min-width: 0;
 }
 
 .account-grid,
@@ -96,7 +96,7 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-@media (max-width: 767px) {
+@media (max-width: 1100px) {
   .page-heading,
   .panel-heading,
   .limits-heading {

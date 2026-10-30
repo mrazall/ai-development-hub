@@ -65,3 +65,16 @@ def test_subscription_check_runs_official_cli_after_credential_presence(tmp_path
         "official CLI check succeeded",
     )
     assert calls[0][0] == ["codex", "login", "status"]
+
+
+def test_worker_shell_hint_per_worker():
+    from aihub_control.routers.accounts import worker_shell_hint
+
+    value = "pc-wsl=wsl -d Ubuntu-24.04 -u dev\nbox=ssh -t box-agents\nbash"
+    assert worker_shell_hint(value, "pc-wsl") == "wsl -d Ubuntu-24.04 -u dev"
+    assert worker_shell_hint(value, "box") == "ssh -t box-agents"
+    assert worker_shell_hint(value, "laptop") == "bash"
+    # A single command (the old format) still applies to every worker; a command may itself contain "=".
+    assert worker_shell_hint("wsl -d Ubuntu-24.04 -u dev", "box") == "wsl -d Ubuntu-24.04 -u dev"
+    assert worker_shell_hint("env A=1 bash", "x") == "env A=1 bash"
+    assert worker_shell_hint("", "x") is None and worker_shell_hint(None, "x") is None

@@ -71,7 +71,10 @@ test('admin creates a task and changes its status', async ({ page, request }) =>
   await page.getByLabel('Название').fill('Проверить панель');
   await page.getByRole('button', { name: 'Создать задачу' }).click();
   await expect(page.getByText('Проверить панель')).toBeVisible();
-  await page.getByLabel('Статус задачи Проверить панель').selectOption('in_progress');
+  await page
+    .getByRole('radiogroup', { name: 'Статус задачи Проверить панель' })
+    .getByRole('radio', { name: 'в работе' })
+    .click();
   await expect
     .poll(async () => {
       const tasks = await (await request.get(`/api/v0/projects/${project}/tasks`, { headers: bearer(token) })).json();

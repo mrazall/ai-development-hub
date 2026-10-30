@@ -50,6 +50,7 @@ ExecStart=$venv/bin/aihub-worker --control-plane $hub_url --worker-id $worker_id
 Restart=on-failure
 RestartSec=5
 Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+${WSL_DISTRO_NAME:+Environment=WSL_DISTRO_NAME=$WSL_DISTRO_NAME}
 
 [Install]
 WantedBy=default.target

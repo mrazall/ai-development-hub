@@ -65,12 +65,12 @@ function LimitBar({ item }: { item: AccountLimitWindow }): JSX.Element {
 }
 
 export function Limits(): JSX.Element {
-  const result = useApi<LimitsResponse>('/limits');
+  // Workers refresh limits every minute on their own; the page follows without a reload.
+  const result = useApi<LimitsResponse>('/limits', { refreshMs: 30_000 });
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
   const accounts = useMemo(() => accountsFrom(result.data), [result.data]);
   const refresh = async (accountId: string) => {
-    if (!window.confirm(t('Обновление тратит немного лимита. Продолжить?'))) return;
     setRefreshing(accountId);
     setNotice('');
     try {

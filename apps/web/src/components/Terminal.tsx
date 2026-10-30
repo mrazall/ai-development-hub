@@ -62,6 +62,20 @@ function ShellTerminal({ terminalId, initialInput }: { terminalId: string; initi
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
+    try {
+      fit.fit();
+    } catch {
+      // the container is hidden while another tab is active
+    }
+    // A terminal can be mounted while its tab is still settling into the split-pane layout.
+    // Fit once the browser has committed that layout; ResizeObserver handles later changes.
+    window.requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        // the container is hidden while another tab is active
+      }
+    });
     const disableCopy = enableCopy(term, container);
     const unfollow = followTheme(term, 'accent');
 
@@ -296,6 +310,18 @@ function AgentView({ sessionId }: { sessionId: string }): JSX.Element {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(container);
+    try {
+      fit.fit();
+    } catch {
+      // the container is hidden while another tab is active
+    }
+    window.requestAnimationFrame(() => {
+      try {
+        fit.fit();
+      } catch {
+        // the container is hidden while another tab is active
+      }
+    });
     const disableCopy = enableCopy(term, container);
     const unfollow = followTheme(term, 'hidden');
     const observer = new ResizeObserver(() => {

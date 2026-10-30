@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from './ui/icons';
 import { t } from '../i18n';
 
@@ -9,6 +9,7 @@ const links = [
   ['/projects', t('Проекты'), 'projects'],
   ['/tasks', t('Задачи'), 'tasks'],
   ['/agents', t('Агенты'), 'agents'],
+  ['/stats', t('Статистика'), 'stats'],
   ['/knowledge', t('Знания'), 'knowledge'],
   ['/knowledge/drafts', t('Черновики агентов'), 'drafts'],
   ['/notifications', t('Уведомления'), 'notifications'],
@@ -23,27 +24,51 @@ const settings = [
   ['/settings/users', t('Пользователи')],
   ['/settings/system', t('Система')],
 ];
-export function NavBar(): JSX.Element {
+export function NavBar({ onMobileMenuChange }: { onMobileMenuChange?: (open: boolean) => void }): JSX.Element {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const firstLinkRef = useRef<HTMLAnchorElement>(null);
+  const setMobileMenu = (next: boolean) => {
+    setOpen(next);
+    onMobileMenuChange?.(next);
+  };
   const closeMenu = () => {
-    setOpen(false);
+    setMobileMenu(false);
     setSettingsOpen(false);
   };
+  useEffect(() => {
+    if (open) firstLinkRef.current?.focus();
+  }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeMenu();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open]);
   return (
     <nav className="nav" aria-label={t('Основная навигация')}>
       <button
         className="nav-toggle"
         aria-expanded={open}
         aria-controls="mobile-navigation"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setMobileMenu(!open)}
       >
         {open ? t('Закрыть меню') : t('Меню')}
       </button>
-      <div className={`nav-links ${open ? 'open' : ''}`} id="mobile-navigation">
+      <div
+        className={`nav-links ${open ? 'open' : ''}`}
+        id="mobile-navigation"
+        data-geometry-overlay={open ? 'mobile-navigation' : undefined}
+        aria-hidden={!open}
+      >
         <span className="nav-group-label">{t('РАБОЧЕЕ ПРОСТРАНСТВО')}</span>
         {links.map(([path, label, icon]) => (
-          <NavLink key={path} to={path} end={path === '/knowledge'} onClick={closeMenu}>
+          <NavLink ref={firstLinkRef} key={path} to={path} end={path === '/knowledge'} onClick={closeMenu}>
             <span className="nav-icon" aria-hidden="true">
               <Icon name={icon as IconName} />
             </span>

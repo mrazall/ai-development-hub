@@ -123,10 +123,14 @@ def _message_rows(db, root: Session) -> list[ChatMessageOut]:
             name = payload.get("tool_name") or payload.get("name") or "tool"
             if event.kind == "tool.result":
                 continue  # the call row is enough in a chat; full output stays in the session view
+            # The label is the model's own description of the step (Claude's `description`); the command or
+            # path ("summary") is what the step expands to.
             summary = payload.get("tool_summary") or payload.get("summary") or payload.get("text") or ""
+            command = payload.get("command")
+            description = command.get("description") if isinstance(command, dict) else None
             result.append(ChatMessageOut(
-                id=str(event.cursor), role="tool", text=str(summary)[:160], tool_name=str(name),
-                tool_summary=str(summary)[:160], created_at=event.ts,
+                id=str(event.cursor), role="tool", text=str(summary)[:2000], tool_name=str(name),
+                tool_summary=str(description or "")[:160], created_at=event.ts,
             ))
     return result
 

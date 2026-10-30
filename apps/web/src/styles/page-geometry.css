@@ -1,0 +1,687 @@
+/* Page geometry fixes. Keep shell and settings-mobile ownership separate. */
+
+/* Grid/flex children must be allowed to shrink before their local data surface scrolls. */
+.projects-panel,
+.project-layout,
+.project-layout > .panel,
+.workspace-grid,
+.workspace-grid > .panel,
+.agents-grid,
+.agents-grid > .panel,
+.chats-shell,
+.chat-conversation,
+.panel > .ui-table-wrap,
+.ui-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.project-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 330px);
+}
+
+/* The table is intentionally wider than a phone; this wrapper is its sole horizontal
+   scroll owner. Keeping the wrapper inside a shrinking panel prevents page-level overflow. */
+.panel > .ui-table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.projects-toolbar,
+.toolbar,
+.ui-toolbar,
+.create-form,
+.page-heading,
+.panel-heading,
+.card-top {
+  min-width: 0;
+}
+
+.projects-toolbar > *,
+.toolbar > *,
+.ui-toolbar > *,
+.create-form > label,
+.create-form > input,
+.create-form > select,
+.create-form > textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.create-form > button {
+  justify-self: start;
+  max-width: 100%;
+}
+
+/* Workspace list rows keep the primary target and any actions in separate, shrinkable
+   tracks. This prevents a long project/session title from covering a neighboring target. */
+.workspace-sidebar .project-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.workspace-sidebar .project-list-item > span:first-child,
+.workspace-sidebar .project-list-item strong,
+.workspace-sidebar .project-list-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-sidebar .session-list-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.workspace-sidebar .session-list-open {
+  display: grid;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 0.2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.workspace-sidebar .session-list-open strong,
+.workspace-sidebar .session-list-open small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-sidebar .session-list-open small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.workspace-sidebar .session-list-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: max-content;
+  margin-left: auto;
+}
+
+@media (max-width: 420px) {
+  .workspace-sidebar .session-list-open {
+    flex-basis: calc(100% - 2.25rem);
+  }
+
+  .workspace-sidebar .session-list-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
+
+/* At 375px the composer cannot fit three controls plus submit in one row. Let the
+   options occupy a full line; the local message area remains the scroll owner. */
+@media (max-width: 600px) {
+  .composer-footer {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .composer-options {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .composer-options select,
+  .composer-account {
+    flex: 1 1 7rem;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .composer-footer > button {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .project-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ui-table-wrap {
+    max-width: 100%;
+  }
+
+  .chats-shell,
+  .workspace-grid.ui-split-2 {
+    height: auto;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+}
+
+/* Full-screen route contract. The application shell is a viewport-sized flex/grid
+   container; route content owns the remaining row instead of subtracting guessed
+   topbar/nav heights. Only these workspace routes suppress document scrolling. */
+html:has(body > #root .content > .chats-shell),
+html:has(body > #root .content > .workspace-grid),
+html:has(body > #root .content > .agents-grid),
+html:has(body > #root .content > .terminal-panel),
+html:has(body > #root .content > .file-layout),
+body:has(.content > .chats-shell),
+body:has(.content > .workspace-grid),
+body:has(.content > .agents-grid),
+body:has(.content > .terminal-panel),
+body:has(.content > .file-layout) {
+  overflow: hidden;
+}
+
+.app-shell:has(> .content > .chats-shell),
+.app-shell:has(> .content > .workspace-grid),
+.app-shell:has(> .content > .agents-grid),
+.app-shell:has(> .content > .terminal-panel) {
+  min-height: 0;
+  height: 100dvh;
+}
+
+.app-shell:has(> .content > .file-layout) {
+  min-height: 0;
+  height: 100dvh;
+}
+
+.content:has(> .chats-shell),
+.content:has(> .workspace-grid),
+.content:has(> .agents-grid),
+.content:has(> .terminal-panel) {
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+/* Chat detail: the conversation is the remaining row and its message list keeps
+   the only meaningful vertical scroll. */
+.content:has(> .chats-shell) {
+  display: flex;
+  flex-direction: column;
+}
+
+.content:has(> .chats-shell) > .chats-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.chats-shell > .chats-sidebar,
+.chats-shell > .chat-conversation,
+.chat-conversation > .conversation-layout {
+  min-height: 0;
+}
+
+/* Workspace and agents: heading/tabs consume their intrinsic height, while the
+   split surface fills what remains. Every pane may shrink before its local list
+   or terminal starts scrolling. */
+.content:has(> .workspace-grid),
+.content:has(> .agents-grid) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The heading and the section tabs keep their own height: on a phone the shrinking flex column squeezed the
+   tabs to 3 px, so the session and its files could not be reached. */
+.content:has(> .workspace-grid) > :not(.workspace-grid),
+.content:has(> .agents-grid) > :not(.agents-grid) {
+  flex-shrink: 0;
+}
+
+.content:has(> .workspace-grid) > .workspace-grid,
+.content:has(> .agents-grid) > .agents-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.workspace-grid.ui-split-2,
+.agents-grid.ui-split-2,
+.workspace-grid > .ui-split-pane,
+.agents-grid > .ui-split-pane,
+.workspace-grid > .ui-split-pane > aside,
+.workspace-grid > .ui-split-pane > main,
+.agents-grid > .ui-split-pane > aside,
+.agents-grid > .ui-split-pane > section {
+  min-height: 0;
+}
+
+.workspace-grid.ui-split-2 > .ui-split-pane > aside,
+.workspace-grid.ui-split-2 > .ui-split-pane > main,
+.agents-grid.ui-split-2 > .ui-split-pane > aside,
+.agents-grid.ui-split-2 > .ui-split-pane > section {
+  height: 100%;
+}
+
+.agents-grid.ui-split-2 > .ui-split-pane > section {
+  overflow: auto;
+}
+
+/* The graph takes what the panel leaves. React Flow sizes itself to 100 % of its box, so every level down to
+   it needs a definite height: a column of flex items does that (a percentage of an auto height was 0 and
+   the graph disappeared). */
+.agents-grid.ui-split-2 > .ui-split-pane > section:has(.agent-graph) {
+  display: flex;
+  flex-direction: column;
+}
+
+.agents-grid .agent-graph {
+  flex: 1 1 auto;
+  min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.agents-grid .agent-flow {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 18rem;
+}
+
+/* Session detail is a standard page in the DOM, but its route contract is a
+   split-view. Keep metadata and event history available through their own pane
+   instead of allowing the document to grow past the viewport. */
+.content:has(> .terminal-panel) {
+  display: flex;
+  flex-direction: column;
+}
+
+.content:has(> .file-layout) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.content:has(> .terminal-panel) > .terminal-panel,
+.content:has(> .terminal-panel) > .detail-grid {
+  min-height: 0;
+  overflow: auto;
+}
+
+.content:has(> .terminal-panel) > .terminal-panel {
+  flex: 1 1 1px;
+  margin-bottom: 0;
+}
+
+.content:has(> .terminal-panel) > .detail-grid {
+  flex: 1 1 1px;
+  margin-top: 1rem;
+}
+
+.content:has(> .terminal-panel) .session-terminal-screen {
+  height: min(540px, 100%);
+  min-height: 0;
+}
+
+.content:has(> .file-layout) > .file-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Canonical shell breakpoint. The old 900/767 split left 768–1100px in a
+   desktop sidebar layout whose topbar and nav could not shrink together. */
+@media (max-width: 1100px) {
+  html,
+  body,
+  #root,
+  .app-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    height: auto;
+  }
+
+  .topbar {
+    --topbar-height: 3.2rem;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    gap: 0.5rem;
+    padding: 0.65rem 0.8rem;
+    box-sizing: border-box;
+    height: var(--topbar-height);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .topbar-brand {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .topbar-brand .brand > span:last-child,
+  .breadcrumb,
+  .account-name,
+  .topbar .theme-control,
+  .topbar .theme-toggle,
+  .global-search kbd {
+    display: none;
+  }
+
+  .global-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .global-search span:nth-child(2) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    flex: 0 0 auto;
+    width: auto;
+    gap: 0.35rem;
+  }
+
+  .nav {
+    --mobile-nav-toggle-height: 3.15rem;
+    position: relative;
+    /* The open menu belongs to this stacking context and must sit above the
+       sticky header instead of being intercepted by its search controls. */
+    z-index: 30;
+    display: block;
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 0.35rem 0.6rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    overflow: visible;
+    box-sizing: border-box;
+    min-height: var(--mobile-nav-toggle-height);
+  }
+
+  .nav-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+  }
+
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: calc(var(--topbar-height, 3.2rem) + var(--mobile-nav-toggle-height, 3.15rem));
+    right: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 40;
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    padding: 0.5rem 0.6rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-top: 0;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-lg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  body:has(.nav-links.open),
+  .app-shell.mobile-navigation-open {
+    overflow: hidden;
+  }
+
+  .nav-links a {
+    width: 100%;
+  }
+
+  .content {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    padding: 1rem 0.8rem 2rem;
+  }
+
+  .file-layout {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .file-tree {
+    max-height: 250px;
+    overflow: auto;
+  }
+
+  .code-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  /* The same mobile panel model is needed through 1100px. Keeping the split
+     panes in a row here is what caused the 768/911 hit-test overlaps. */
+  .workspace-grid.ui-split-2,
+  .agents-grid.ui-split-2 {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane,
+  .agents-grid.ui-split-2 > .ui-split-pane {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane > .workspace-sidebar,
+  .workspace-grid.ui-split-2 > .ui-split-pane > .workspace-center {
+    min-height: 0;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane > .workspace-sidebar {
+    overflow: auto;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane > .workspace-center {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .workspace-center > .session-workspace {
+    min-height: 0;
+  }
+
+  /* At a reduced effective height the terminal's intrinsic height must not
+     push the composer over the viewport. The workspace owns the scroll and
+     the session remains a normal flow column inside it. */
+  .workspace-grid.ui-split-2 {
+    overflow: auto;
+    max-height: 100%;
+  }
+
+  .session-terminal-tabs > .segmented {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .session-terminal-tabs > .segmented button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane > .workspace-center {
+    overflow: visible;
+  }
+
+  .workspace-center > .session-workspace {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .session-workspace > .session-tabs-area,
+  .session-tabs-area > .session-terminal-tabs,
+  .session-terminal-tabs > .session-terminal {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  .session-terminal-tabs .session-terminal-screen {
+    height: min(20rem, 40dvh);
+    min-height: 11rem;
+  }
+
+  .session-terminal-tabs > .session-terminal-extra {
+    max-height: 20rem;
+  }
+
+  .workspace-grid[data-mobile-tab='sessions'] .workspace-center,
+  .workspace-grid[data-mobile-tab='sessions'] .workspace-right,
+  .workspace-grid[data-mobile-tab='chat'] .workspace-sidebar,
+  .workspace-grid[data-mobile-tab='chat'] .workspace-right,
+  .workspace-grid[data-mobile-tab='terminal'] .workspace-sidebar,
+  .workspace-grid[data-mobile-tab='terminal'] .workspace-right,
+  .workspace-grid[data-mobile-tab='events'] .workspace-sidebar,
+  .workspace-grid[data-mobile-tab='events'] .workspace-center {
+    display: none;
+  }
+
+  .chats-shell {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .chats-shell.has-selection .chats-sidebar {
+    display: none;
+  }
+
+  .chats-shell:not(.has-selection) .chat-conversation {
+    display: none;
+  }
+
+  .conversation-header {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .app-shell:has(> .content > .chats-shell),
+  .app-shell:has(> .content > .workspace-grid),
+  .app-shell:has(> .content > .agents-grid),
+  .app-shell:has(> .content > .terminal-panel),
+  .app-shell:has(> .content > .file-layout) {
+    height: 100dvh;
+  }
+
+  .app-shell:has(> .content > .chats-shell) > .content,
+  .app-shell:has(> .content > .workspace-grid) > .content,
+  .app-shell:has(> .content > .agents-grid) > .content,
+  .app-shell:has(> .content > .terminal-panel) > .content,
+  .app-shell:has(> .content > .file-layout) > .content {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-shell:has(> .content > .chats-shell),
+  .app-shell:has(> .content > .workspace-grid),
+  .app-shell:has(> .content > .agents-grid),
+  .app-shell:has(> .content > .terminal-panel) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-shell:has(> .content > .chats-shell) > .topbar,
+  .app-shell:has(> .content > .workspace-grid) > .topbar,
+  .app-shell:has(> .content > .agents-grid) > .topbar,
+  .app-shell:has(> .content > .terminal-panel) > .topbar,
+  .app-shell:has(> .content > .chats-shell) > .nav,
+  .app-shell:has(> .content > .workspace-grid) > .nav,
+  .app-shell:has(> .content > .agents-grid) > .nav,
+  .app-shell:has(> .content > .terminal-panel) > .nav {
+    flex: 0 0 auto;
+  }
+
+  .app-shell:has(> .content > .chats-shell) > .content,
+  .app-shell:has(> .content > .workspace-grid) > .content,
+  .app-shell:has(> .content > .agents-grid) > .content,
+  .app-shell:has(> .content > .terminal-panel) > .content {
+    flex: 1 1 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .workspace-grid.ui-split-2,
+  .agents-grid.ui-split-2 {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane,
+  .agents-grid.ui-split-2 > .ui-split-pane {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .workspace-grid.ui-split-2 > .ui-split-pane:has(> .workspace-sidebar),
+  .workspace-grid.ui-split-2 > .ui-split-pane:has(> main.workspace-center),
+  .agents-grid.ui-split-2 > .ui-split-pane {
+    flex: 1 1 50%;
+  }
+
+  .workspace-grid.ui-split-2[data-mobile-tab='chat'] > .ui-split-pane:has(> .workspace-sidebar),
+  .workspace-grid.ui-split-2[data-mobile-tab='files'] > .ui-split-pane:has(> .workspace-sidebar),
+  .workspace-grid.ui-split-2[data-mobile-tab='sessions'] > .ui-split-pane:has(> main.workspace-center) {
+    display: none;
+  }
+
+  .agents-grid .agent-flow {
+    height: clamp(18rem, 42dvh, 28rem);
+    min-height: 18rem;
+  }
+
+  .content:has(> .terminal-panel) > .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content:has(> .terminal-panel) > .terminal-panel,
+  .content:has(> .terminal-panel) > .detail-grid {
+    flex-basis: 0;
+  }
+}

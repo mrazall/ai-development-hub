@@ -60,5 +60,5 @@ def latest_codex_rollout_rate_limits(
     ]
     if not candidates:
         return []
-    newest = max(candidates, key=lambda path: path.stat().st_mtime)
+    newest = max(candidates, key=lambda path: (path.stat().st_mtime, path))
     return parse_codex_rate_limits_file(newest)

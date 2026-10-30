@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, changedEvent } from './client';
+import { api, ApiError, changedEvent } from './client';
 import { t } from '../i18n';
 
-export type Loadable<T> = { data: T | null; error: string; loading: boolean; reload: () => void };
+export type Loadable<T> = {
+  data: T | null;
+  error: string;
+  loading: boolean;
+  status: number | null;
+  reload: () => void;
+};
 const EMPTY_ARRAY: never[] = [];
 
 /** Keep list screens usable when an older/partial API response omits a collection. */
@@ -19,6 +25,7 @@ export function arrayOrEmpty<T>(value: unknown): T[] {
 export function useApi<T>(path: string | null, options: { refreshMs?: number } = {}): Loadable<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState<number | null>(null);
   const [loading, setLoading] = useState(path !== null);
   const [generation, setGeneration] = useState(0);
   const shown = useRef<string | null>(null);
@@ -55,11 +62,15 @@ export function useApi<T>(path: string | null, options: { refreshMs?: number } =
         if (!cancelled) {
           setData(result);
           setError('');
+          setStatus(null);
           shown.current = path;
         }
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : t('Не удалось загрузить данные'));
+        if (!cancelled) {
+          setError(cause instanceof Error ? cause.message : t('Не удалось загрузить данные'));
+          setStatus(cause instanceof ApiError ? cause.status : null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -69,7 +80,7 @@ export function useApi<T>(path: string | null, options: { refreshMs?: number } =
     };
   }, [path, generation]);
 
-  return { data, error, loading, reload };
+  return { data, error, loading, status, reload };
 }
 
 export function errorText(cause: unknown, fallback: string): string {

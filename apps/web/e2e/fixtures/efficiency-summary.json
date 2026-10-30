@@ -1,0 +1,25 @@
+{
+  "filters": { "days": 30 },
+  "since": null,
+  "kpi": {
+    "completed_tasks": 1,
+    "tokens_per_completed_task": 1234,
+    "cost_per_completed_task": null,
+    "cost_partial": true,
+    "median_wall_s": null,
+    "orchestrator_cost_share": null,
+    "orchestrator_cost_share_exact": false,
+    "confirmed_retries": 1,
+    "total_tokens": 1234,
+    "total_cost_usd": 1.5,
+    "unpriced_tokens": 234
+  },
+  "series": [],
+  "granularity": "day",
+  "by_role": [
+    { "role": "executor", "tokens": 1234, "cost_usd": 1.5, "cost_partial": true, "token_share": 1, "cost_share": null }
+  ],
+  "by_trigger": [],
+  "context": { "cache_read_share": null, "fresh_to_cache_ratio": null, "compactions": null, "continuation_tokens": 0 },
+  "observations": []
+}

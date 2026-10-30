@@ -53,6 +53,9 @@ def test_chat_lifecycle_and_chain_history(client, admin_token):  # noqa: F811
     db.add_all([
         AgentEvent(session_id=child_id, kind="message", source="native", payload={"role": "assistant", "text": "Второй ответ"}),
         AgentEvent(session_id=child_id, kind="message", source="native", payload={"role": "assistant", "text": "скрытый", "partial": True}),
+        AgentEvent(session_id=child_id, kind="tool.call", source="native", payload={
+            "name": "Bash", "summary": "gh run list -L 5",
+            "command": {"command": "gh run list -L 5", "description": "Найти упавший прогон CI"}}),
         AgentEvent(session_id=child_id, kind="tool.call", source="native", payload={"name": "knowledge", "text": "x" * 200}),
     ])
     db.commit()
@@ -64,8 +67,11 @@ def test_chat_lifecycle_and_chain_history(client, admin_token):  # noqa: F811
     assert [message["text"] for message in messages if message["role"] != "tool"] == [
         "  Что у меня на\nVDS? ", "Первый ответ", "Продолжение", "Второй ответ"
     ]
+    # A step the model described: its description is the label, the command is behind it.
+    assert (messages[-2]["tool_summary"], messages[-2]["text"]) == ("Найти упавший прогон CI", "gh run list -L 5")
     assert messages[-1]["role"] == "tool"
-    assert len(messages[-1]["tool_summary"]) == 160
+    # The label is the model's description of the step (none here); the command is the detail behind it.
+    assert messages[-1]["tool_summary"] == "" and messages[-1]["text"] == "x" * 200
     assert client.get("/api/v0/chats?q=VDS", headers=auth(admin_token)).json()[0]["id"] == chat["id"]
 
     assert client.patch(

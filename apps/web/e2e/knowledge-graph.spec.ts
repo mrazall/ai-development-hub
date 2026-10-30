@@ -2,6 +2,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { graph100x300, graph300x1000, type KnowledgeGraphResponse } from './fixtures/graph-datasets';
 
+// The real user graph test requires a running knowledge service with real, connected documents.
 const password = process.env.AIHUB_E2E_ADMIN_PASSWORD ?? '';
 async function login(page: Page): Promise<void> {
   await page.goto('/login');

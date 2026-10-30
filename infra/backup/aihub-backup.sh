@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # Backs up only this project's database and non-secret configuration. It never
 # runs restic against an existing homelab repository unless explicitly passed.
-repo="${AIHUB_RESTIC_REPOSITORY:-/srv/media/restic-aihub}"
+repo="${AIHUB_RESTIC_REPOSITORY:-/srv/media2/restic-aihub}"
 password_file="${AIHUB_RESTIC_PASSWORD_FILE:-$HOME/ai-dev-hub/secrets/restic-aihub-password}"
 compose_file="${AIHUB_COMPOSE_FILE:-infra/docker-compose.yml}"
 compose_project="${AIHUB_COMPOSE_PROJECT:-aihub}"
@@ -16,19 +16,32 @@ include_vault="${AIHUB_BACKUP_INCLUDE_VAULT:-0}"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/aihub-backup.XXXXXX")"
 started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-report_failure() {
-  local rc="$1" token report finished
-  [[ -r "$token_file" ]] || return 0
+# report <id> <kind> <ok> <size_bytes|""> <error|"">: one row on the panel's Backups page per kind.
+report() {
+  local token body
+  [[ -r "$token_file" ]] || { echo "report token file is not readable" >&2; return 1; }
   token="$(<"$token_file")"
-  finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  report="$(python3 - "$started" "$finished" "$rc" <<'PY'
+  body="$(python3 - "$1" "$2" "$3" "$4" "$5" "$started" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" <<'PY'
 import json, sys
-print(json.dumps({"id": "failed-" + sys.argv[2].replace(":", ""), "repo": "restic-aihub", "kind": "database", "started_at": sys.argv[1], "finished_at": sys.argv[2], "ok": False, "error": "backup command failed (exit " + sys.argv[3] + ")", "tags": ["aihub"]}))
+id_, kind, ok, size, error, started, finished = sys.argv[1:]
+row = {"id": id_, "repo": "restic-aihub", "kind": kind, "started_at": started, "finished_at": finished,
+       "ok": ok == "1", "tags": ["aihub"]}
+if size:
+    row["size_bytes"] = int(size)
+if error:
+    row["error"] = error
+print(json.dumps(row))
 PY
   )"
-  curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors --max-time 20 \
+  curl --fail-with-body --silent --show-error --retry 4 --retry-all-errors --max-time 20 \
     -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-    --data "$report" "$report_url" >/dev/null || true
+    --data "$body" "$report_url" >/dev/null
+}
+
+report_failure() {
+  local stamp
+  stamp="failed-$(date -u +%Y%m%dT%H%M%SZ)"
+  report "$stamp" database 0 "" "backup command failed (exit $1)" || true
 }
 
 trap 'rc=$?; if ((rc != 0)); then report_failure "$rc"; fi; rm -rf -- "$work_dir"; exit "$rc"' EXIT
@@ -53,9 +66,11 @@ docker compose -p "$compose_project" -f "$compose_file" exec -T postgres pg_dump
 for path in infra/docker-compose.yml infra/docker-compose.override.yml infra/.env.example; do
   [[ -f "$path" ]] && cp -- "$path" "$work_dir/config/"
 done
-if [[ "$include_vault" == 1 && -d "${AIHUB_VAULT_HOST_DIR:-./vault}" ]]; then
-  mkdir -p "$work_dir/config/vault"
-  cp -a -- "${AIHUB_VAULT_HOST_DIR:-./vault}/." "$work_dir/config/vault/"
+vault_dir="${AIHUB_VAULT_HOST_DIR:-./vault}"
+if [[ "$include_vault" == 1 ]]; then
+  [[ -d "$vault_dir" ]] || { echo "vault directory $vault_dir not found" >&2; exit 3; }
+  mkdir -p "$work_dir/vault"
+  cp -a -- "$vault_dir/." "$work_dir/vault/"
 fi
 
 backup_json="$work_dir/restic.json"
@@ -67,18 +82,12 @@ size_bytes="$(stat -c '%s' "$dump")"
 restic forget --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
 [[ "$run_check" == 1 ]] && restic check
 
-finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if [[ -r "$token_file" ]]; then
-  token="$(<"$token_file")"
-  report="$(python3 - "$snapshot_id" "$started" "$finished" "$size_bytes" <<'PY'
-import json, sys
-print(json.dumps({"id": sys.argv[1], "repo": "restic-aihub", "kind": "database", "started_at": sys.argv[2], "finished_at": sys.argv[3], "ok": True, "size_bytes": int(sys.argv[4]), "tags": ["aihub"]}))
-PY
-  )"
-  curl --fail-with-body --silent --show-error --retry 4 --retry-all-errors --max-time 20 \
-    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-    --data "$report" "$report_url" >/dev/null
-else
-  echo "backup completed; report token file is not readable" >&2
+# The config files and the vault ride in the same restic snapshot; each gets its own row (id suffixed).
+report "$snapshot_id" database 1 "$size_bytes" "" || echo "backup completed; database report failed" >&2
+report "$snapshot_id-config" config 1 "$(du -sb "$work_dir/config" | cut -f1)" "" || true
+vault_size=""
+if [[ "$include_vault" == 1 ]]; then
+  vault_size="$(du -sb "$work_dir/vault" | cut -f1)"
+  report "$snapshot_id-vault" vault 1 "$vault_size" "" || true
 fi
-printf 'AI Hub backup completed: snapshot=%s size_bytes=%s\n' "$snapshot_id" "$size_bytes"
+printf 'AI Hub backup completed: snapshot=%s size_bytes=%s vault_bytes=%s\n' "$snapshot_id" "$size_bytes" "${vault_size:-off}"

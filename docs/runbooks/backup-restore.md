@@ -11,8 +11,10 @@ mode `0600`. The scripts default to `~/ai-dev-hub/secrets/restic-aihub-password`
 
 Run `infra/backup/aihub-backup.sh` from the repository root. Set
 `AIHUB_RESTIC_CHECK=1` for an integrity check after pruning. Vault is already backed
-up by the homelab; set `AIHUB_BACKUP_INCLUDE_VAULT=1` only when an independent copy
-is explicitly required.
+up by the homelab; set `AIHUB_BACKUP_INCLUDE_VAULT=1` (with `AIHUB_VAULT_HOST_DIR`)
+only when an independent copy is explicitly required. The repository defaults to
+`/srv/media2/restic-aihub` (`AIHUB_RESTIC_REPOSITORY`). Each run reports one row per
+kind to the Backups page: `database`, `config` and, when included, `vault`.
 
 Run `infra/backup/aihub-restore-test.sh` monthly. It restores the newest restic
 snapshot into the temporary database `aihub_restore_test`, counts rows in the

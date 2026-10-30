@@ -54,4 +54,5 @@ def refresh_limits(account_id: str, _user=Depends(current_user), db=Depends(db_d
     request = WorkerRequest(worker_id=account.worker_id, kind="limits_refresh", response={"account_id": account.id, "kind": account.kind})
     db.add(request)
     db.commit()
-    return {"queued": True, "request_id": request.id, "warning": "Обновление тратит немного лимита"}
+    # The worker reads the CLI's own /usage or /status: no model call, the limit is not spent.
+    return {"queued": True, "request_id": request.id}

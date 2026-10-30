@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 
 from ..auth import current_user, db_dep, issue_scoped_token, worker_principal
 from ..config import Settings
-from ..deps import project_or_404
+from ..deps import mark_offline, project_or_404
 from ..models import AgentEvent, Attachment, Project, Session, Task, Worker, WorkerCapability, WorkerRequest
 from ..models import AccountProfile
 from .attachments import _storage_root
@@ -262,6 +262,10 @@ def capabilities(
     snapshot = db.get(WorkerCapability, worker_id) or WorkerCapability(worker_id=worker_id)
     snapshot.capabilities = payload.get("engines", {})
     snapshot.workspace_url = payload.get("workspace_url")
+    shell_hint = payload.get("shell_hint")
+    snapshot.shell_hint = shell_hint[:200] if isinstance(shell_hint, str) and shell_hint.strip() else None
+    models = payload.get("models")
+    snapshot.models = models if isinstance(models, dict) and len(str(models)) < 50_000 else None
     db.add(snapshot)
     db.commit()
     return {"ok": True, "worker_id": worker_id, "engines": payload.get("engines", {})}
@@ -269,13 +273,21 @@ def capabilities(
 
 @router.get("/workers/{worker_id}")
 def worker_details(worker_id: str, user=Depends(current_user), db=Depends(db_dep)):
+    # The session page shows the worker's state from here: status and last heartbeat with the capabilities.
+    mark_offline(db)
+    worker = db.get(Worker, worker_id)
     capability = db.get(WorkerCapability, worker_id)
-    if not capability:
+    if not worker and not capability:
         raise HTTPException(404, "worker not found")
     return {
+        "id": worker_id,
         "worker_id": worker_id,
-        "capabilities": capability.capabilities,
-        "workspace_url": capability.workspace_url,
+        "host": worker.host if worker else None,
+        "status": worker.status if worker else "unknown",
+        "last_heartbeat_at": worker.last_heartbeat_at if worker else None,
+        "capabilities": capability.capabilities if capability else {},
+        "workspace_url": capability.workspace_url if capability else None,
+        "models": (capability.models if capability else None) or {},
     }
 
 

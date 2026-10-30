@@ -6,7 +6,7 @@ infra/secrets/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
-node_modules/
+node_modules
 .claude/settings.local.json
 .cache/
 dist/

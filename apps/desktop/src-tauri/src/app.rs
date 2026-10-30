@@ -34,6 +34,10 @@ pub fn show_panel(app: &tauri::AppHandle, base: &str, path: Option<&str>) -> Res
     let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(parsed))
         .title("AI Development Hub")
         .inner_size(1280.0, 820.0)
+        .min_inner_size(640.0, 400.0)
+        // The panel's topbar is the title bar (drag region, window buttons); Windows keeps the resize
+        // borders, the shadow, Aero Snap and the system shortcuts of the undecorated window.
+        .decorations(!cfg!(windows))
         .visible(false)
         .on_navigation(move |candidate| {
             if crate::url::is_allowed_navigation(&hub, candidate) {
@@ -78,6 +82,14 @@ fn grant_panel_bridge(app: &tauri::AppHandle, base: &str) {
             "allow-worker-logs",
             "allow-login",
             "allow-open-app-settings",
+            // The topbar as title bar: drag, double click, window buttons.
+            "core:window:allow-start-dragging",
+            "core:window:allow-internal-toggle-maximize",
+            "core:window:allow-minimize",
+            "core:window:allow-toggle-maximize",
+            "core:window:allow-close",
+            "core:window:allow-is-maximized",
+            "core:window:allow-is-decorated",
         ]
         .into_iter()
         .fold(

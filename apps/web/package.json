@@ -10,7 +10,10 @@
     "typecheck": "tsc -b",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:ui-smoke": "playwright test ui-audit.spec.ts --project=ui-smoke-375 --project=ui-smoke-1366 --project=ui-smoke-1920",
+    "test:ui-audit": "playwright test ui-audit.spec.ts",
+    "test:ui-visual": "playwright test ui-visual.spec.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",

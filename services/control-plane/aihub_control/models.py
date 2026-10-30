@@ -207,6 +207,7 @@ class AgentEvent(Base):
     cursor: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(36), index=True)
     client_event_id: Mapped[str | None] = mapped_column(String(255))
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True)
     schema_version: Mapped[int] = mapped_column(Integer, default=1)
     kind: Mapped[str] = mapped_column(String(64))
     source: Mapped[str] = mapped_column(String(32))
@@ -310,6 +311,10 @@ class WorkerCapability(Base):
     )
     capabilities: Mapped[dict] = mapped_column(JSON, default=dict)
     workspace_url: Mapped[str | None] = mapped_column(Text)
+    # How to open a terminal on this worker ("wsl -d Ubuntu -u dev", "ssh -t dev@host"), as it reports it.
+    shell_hint: Mapped[str | None] = mapped_column(Text)
+    # {"codex": [{"slug", "name", "efforts", "default_effort"}]} — what the worker's CLIs offer.
+    models: Mapped[dict | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
 
 
@@ -402,3 +407,30 @@ class SystemSetting(Base):
 def _status_changed(target, value, oldvalue, _initiator):
     if value != oldvalue:
         target.acknowledged_at = None
+
+
+# --- efficiency: execution runs ---
+class ExecutionRun(Base):
+    __tablename__ = "execution_runs"
+    __table_args__ = (UniqueConstraint("session_id", "run_index"), {"schema": "control"})
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    session_id: Mapped[str] = mapped_column(String(36), index=True)
+    task_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    project_id: Mapped[str] = mapped_column(String(63), index=True)
+    run_index: Mapped[int] = mapped_column(Integer)
+    external_run_id: Mapped[str | None] = mapped_column(String(64))
+    engine: Mapped[str | None] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(String(128))
+    account_profile_id: Mapped[str | None] = mapped_column(String(36))
+    role: Mapped[str | None] = mapped_column(String(16))
+    orchestration_id: Mapped[str | None] = mapped_column(String(36))
+    trigger: Mapped[str] = mapped_column(String(24))
+    queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+    failure_reason: Mapped[str | None] = mapped_column(Text)
+    attribution: Mapped[str] = mapped_column(String(16))
+    waiting_approval_s: Mapped[float | None] = mapped_column(Float)
+    waiting_limit_s: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

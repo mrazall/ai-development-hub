@@ -1,3 +1,4 @@
+import type { WorkerModel } from './models';
 // Shapes of control-plane API responses (packages/contracts, API v0).
 
 export type Project = {
@@ -119,6 +120,7 @@ export type OrchestrationView = {
 export type WorkerDetails = Worker & {
   workspace_url?: string | null;
   capabilities?: Record<string, string>;
+  models?: { codex?: WorkerModel[] };
 };
 
 export type GraphNode = {

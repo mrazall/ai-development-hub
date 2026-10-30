@@ -3,6 +3,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 
+// The knowledge list test requires a running knowledge service containing real documents.
 const adminPassword = process.env.AIHUB_E2E_ADMIN_PASSWORD ?? '';
 
 async function login(page: Page, password = adminPassword): Promise<void> {
@@ -55,12 +56,15 @@ async function waitForEvent(page: Page, sessionId: string, predicate: (event: Ev
 
 function startMockWorker(workerId: string, sessionId: string): ChildProcess {
   const root = resolve('..', '..');
+  const workerBaseUrl = process.env.AIHUB_E2E_BASE_URL ?? 'http://127.0.0.1:58094';
   const workerScript = [
     'import asyncio, httpx',
     'from pathlib import Path',
     'from aihub_agents.worker import Worker',
     'async def run():',
-    "    w = Worker('http://127.0.0.1:58094', '" +
+    "    w = Worker('" +
+      workerBaseUrl +
+      "', '" +
       workerId +
       "', Path('e2e-worker-token').read_text(), enabled_engines={'mock'})",
     '    await w.capabilities()',
@@ -68,7 +72,11 @@ function startMockWorker(workerId: string, sessionId: string): ChildProcess {
     "        await w.run_assignment(client, {'id': '" + sessionId + "'})",
     'asyncio.run(run())',
   ].join('\n');
-  const child = spawn(resolve(root, '.venv-dev-k/bin/python'), ['-c', workerScript], {
+  const adapterPython = resolve(root, 'packages/agent-adapters/.venv/bin/python');
+  const python =
+    process.env.AIHUB_E2E_WORKER_PYTHON ||
+    (existsSync(adapterPython) ? adapterPython : resolve(root, '.venv-dev-k/bin/python'));
+  const child = spawn(python, ['-c', workerScript], {
     cwd: root,
     env: { ...process.env, PYTHONPATH: join(root, 'packages/agent-adapters') },
     stdio: ['ignore', 'ignore', 'pipe'],

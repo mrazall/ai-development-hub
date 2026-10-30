@@ -62,7 +62,8 @@ def test_codex_command_is_workspace_scoped_and_contains_prompt(tmp_path):
     adapter = CodexExecAdapter("/profile", tmp_path, "gpt-test", "Fix the tests")
     assert adapter.command == [
         "codex", "exec", "--json", "--cd", str(tmp_path), "--sandbox", "workspace-write",
-        "--skip-git-repo-check", "-m", "gpt-test", "--", "Fix the tests",
+        "--skip-git-repo-check", "-m", "gpt-test", "-c", "sandbox_workspace_write.network_access=true",
+        "--", "Fix the tests",
     ]
     assert adapter.workdir == str(tmp_path)
     assert "danger-full-access" not in adapter.command
@@ -196,14 +197,32 @@ def test_codex_rollout_parser_uses_newest_session_file_only(tmp_path):
     new = tmp_path / "sessions" / "new"
     old.mkdir(parents=True)
     new.mkdir(parents=True)
-    (old / "rollout-old.jsonl").write_text('{"rate_limits":{"primary":{"used_percent":1}}}\n')
+    older = old / "rollout-old.jsonl"
+    older.write_text('{"rate_limits":{"primary":{"used_percent":1}}}\n')
     newest = new / "rollout-new.jsonl"
     newest.write_text('{"noise":"ignored"}\n{"rate_limits":{"primary":{"used_percent":42,"resets_at":123},"secondary":{"used_percent":7}}}\n')
-    import os
-    result = latest_codex_rollout_rate_limits(tmp_path, os.path.getmtime(newest) - 1)
+    new_mtime = os.path.getmtime(newest)
+    os.utime(older, (new_mtime - 100, new_mtime - 100))
+    os.utime(newest, (new_mtime, new_mtime))
+    result = latest_codex_rollout_rate_limits(tmp_path, new_mtime - 50)
     assert result == [
         {"kind": "five_hour", "used_percent": 42.0, "resets_at": 123},
         {"kind": "seven_day", "used_percent": 7.0, "resets_at": None},
+    ]
+
+
+def test_codex_rollout_equal_mtime_uses_path_tiebreak(tmp_path):
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    later_path = sessions / "rollout-z.jsonl"
+    earlier_path = sessions / "rollout-a.jsonl"
+    later_path.write_text('{"rate_limits":{"primary":{"used_percent":42}}}\n')
+    earlier_path.write_text('{"rate_limits":{"primary":{"used_percent":1}}}\n')
+    os.utime(later_path, (1000, 1000))
+    os.utime(earlier_path, (1000, 1000))
+
+    assert latest_codex_rollout_rate_limits(tmp_path, 999) == [
+        {"kind": "five_hour", "used_percent": 42.0, "resets_at": None},
     ]
 
 
@@ -349,3 +368,80 @@ def test_orchestrator_may_use_the_web():
     assert {"WebSearch", "WebFetch"} <= set(ORCHESTRATOR_TOOLS)
     # Everything it is allowed to use is in its (lean) tool set, so nothing is approved but missing.
     assert set(ORCHESTRATOR_TOOLS) - {"mcp__knowledge"} <= set(CHAT_TOOLS.split())
+
+
+def test_runs_may_last_a_day_but_not_longer(monkeypatch):
+    from aihub_agents.worker import session_timeout_seconds
+
+    monkeypatch.delenv("AIHUB_ORCHESTRATOR_MAX_SECONDS", raising=False)
+    assert session_timeout_seconds({}) == 86400
+    assert session_timeout_seconds({"role": "orchestrator"}) == 86400
+    assert session_timeout_seconds({}, 7200) == 7200
+    assert session_timeout_seconds({}, 10 * 86400) == 86400
+    monkeypatch.setenv("AIHUB_ORCHESTRATOR_MAX_SECONDS", "999999")
+    assert session_timeout_seconds({"role": "orchestrator"}) == 86400
+
+
+def test_shell_hint_names_wsl_or_ssh(monkeypatch, tmp_path):
+    import aihub_agents.worker as worker
+
+    monkeypatch.delenv("AIHUB_SHELL_HINT", raising=False)
+    monkeypatch.setenv("USER", "dev")
+    release = tmp_path / "osrelease"
+    real_path = worker.Path
+    monkeypatch.setattr(worker, "Path", lambda p: release if p == "/proc/sys/kernel/osrelease" else real_path(p))
+    release.write_text("6.6.87.2-microsoft-standard-WSL2")
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu-24.04")
+    assert worker.shell_hint() == "wsl -d Ubuntu-24.04 -u dev"
+    monkeypatch.delenv("WSL_DISTRO_NAME")
+    assert worker.shell_hint() == "wsl -u dev"
+    release.write_text("6.8.0-generic")
+    monkeypatch.setattr(worker.socket, "gethostname", lambda: "buildbox")
+    assert worker.shell_hint() == "ssh -t dev@buildbox"
+    monkeypatch.setenv("AIHUB_SHELL_HINT", "ssh -t my-alias")
+    assert worker.shell_hint() == "ssh -t my-alias"
+
+
+def test_codex_effort_and_models_from_its_cache(monkeypatch, tmp_path):
+    import json as _json
+
+    import aihub_agents.worker as worker
+    from aihub_agents.adapters import CodexExecAdapter
+
+    command = CodexExecAdapter(None, "/tmp/w", "gpt-6.1-sol", "hi", effort="high").command
+    assert command[command.index("-c", command.index("-m")) + 1] == 'model_reasoning_effort="high"'
+    assert "model_reasoning_effort" not in " ".join(CodexExecAdapter(None, "/tmp/w", "m", "hi").command)
+
+    cache = tmp_path / ".aihub/accounts/codex-a/codex/models_cache.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(_json.dumps({"models": [
+        {"slug": "gpt-6.1-sol", "display_name": "GPT-6.1-Sol", "visibility": "list",
+         "supported_reasoning_levels": [{"effort": "low"}, {"effort": "ultra"}], "default_reasoning_level": "low"},
+        {"slug": "hidden", "visibility": "hide"},
+    ]}))
+    monkeypatch.setattr(worker.Path, "home", classmethod(lambda cls: tmp_path))
+    assert worker.codex_models() == [
+        {"slug": "gpt-6.1-sol", "name": "GPT-6.1-Sol", "efforts": ["low", "ultra"], "default_effort": "low"}]
+
+
+def test_codex_executors_get_network_and_the_shared_git(tmp_path):
+    import subprocess
+
+    from aihub_agents.adapters import CodexExecAdapter
+    from aihub_agents.worker import git_common_dirs
+
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
+                    "--allow-empty", "-m", "init"], check=True)
+    tree = tmp_path / "tree"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(tree)], check=True)
+    # A worktree's commits land in the main checkout's .git; a plain checkout's .git is named as well.
+    assert git_common_dirs(tree) == [str((repo / ".git").resolve())]
+    assert git_common_dirs(repo) == [str((repo / ".git").resolve())]
+    assert git_common_dirs(tmp_path / "nowhere") == []
+
+    command = CodexExecAdapter(None, str(tree), "m", "hi", writable_roots=git_common_dirs(tree)).command
+    settings = [command[i + 1] for i, part in enumerate(command) if part == "-c"]
+    assert "sandbox_workspace_write.network_access=true" in settings
+    assert f'sandbox_workspace_write.writable_roots=["{(repo / ".git").resolve()}"]' in settings

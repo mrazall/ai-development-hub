@@ -28,6 +28,7 @@ ExecStart=$V/bin/aihub-worker --control-plane $HUB_URL --worker-id $WORKER_ID --
 Restart=on-failure
 RestartSec=5
 Environment=PATH=$HOME/.opencode/bin:/usr/local/bin:/usr/bin:/bin
+${WSL_DISTRO_NAME:+Environment=WSL_DISTRO_NAME=$WSL_DISTRO_NAME}
 
 [Install]
 WantedBy=default.target

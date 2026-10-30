@@ -22,8 +22,10 @@ def is_admin(principal):
 
 # What a chat view shows. A long agent run is ~95 % engine bookkeeping (thinking ticks, tool progress,
 # streamed partials); without this filter the latest N events held only a couple of messages.
-CHAT_KINDS = ("message", "session.status", "diff", "approval.request")
-ACTIVITY_KINDS = (*CHAT_KINDS, "tool.call", "tool.result", "output")
+# Tool calls are in the chat too (folded into one line per run of steps, like Claude Code); their results and
+# the raw output stay in the agent terminal and the events log.
+CHAT_KINDS = ("message", "session.status", "diff", "approval.request", "tool.call")
+ACTIVITY_KINDS = (*CHAT_KINDS, "tool.result", "output")
 CHAT_RAW_TYPES = ("assistant", "item.completed")
 EVENT_VIEWS = ("chat", "activity", "events")
 

@@ -73,7 +73,7 @@
 }
 body {
   margin: 0;
-  min-width: 360px;
+  min-width: 0;
 }
 a {
   color: inherit;
@@ -180,7 +180,8 @@ label {
   display: flex;
   gap: 0.35rem;
   padding: 0.75rem clamp(1rem, 4vw, 4rem);
-  overflow-x: auto;
+  min-width: 0;
+  overflow: visible;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
@@ -189,6 +190,7 @@ label {
   align-items: center;
   gap: 0.35rem;
   width: 100%;
+  min-width: 0;
 }
 .nav-toggle {
   display: none;
@@ -237,6 +239,8 @@ label {
   max-width: 1440px;
   margin: auto;
   padding: clamp(1.25rem, 4vw, 3rem) clamp(1rem, 4vw, 4rem);
+  min-width: 0;
+  min-height: 0;
 }
 .page-heading,
 .panel-heading,
@@ -502,7 +506,8 @@ textarea:focus-visible {
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--nav-width) minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
 }
 .topbar {
   grid-column: 1 / -1;
@@ -515,12 +520,13 @@ textarea:focus-visible {
   position: sticky;
   top: 0;
   z-index: 20;
+  min-width: 0;
 }
 .topbar-brand {
   display: flex;
   align-items: center;
   gap: 1rem;
-  min-width: var(--nav-width);
+  min-width: 0;
 }
 .brand {
   display: inline-flex;
@@ -577,7 +583,8 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  min-height: calc(100dvh - 4.25rem);
+  min-height: 0;
+  min-width: 0;
   padding: 1rem 0.75rem;
   background: color-mix(in srgb, var(--surface-raised) 75%, transparent);
   border: 0;
@@ -625,6 +632,7 @@ textarea:focus-visible {
   max-width: none;
   width: 100%;
   min-width: 0;
+  min-height: 0;
   margin: 0;
   padding: clamp(1.25rem, 3vw, 3rem) clamp(1rem, 4vw, 4rem);
 }
@@ -922,7 +930,7 @@ h1 {
   overflow: auto;
 }
 .ui-split-3 {
-  grid-template-columns: var(--split-size) 0.45rem minmax(16rem, 1fr) 0.45rem minmax(18rem, 0.8fr);
+  grid-template-columns: minmax(0, var(--split-size)) 0.45rem minmax(0, 1fr) 0.45rem minmax(0, 0.8fr);
   min-height: calc(100dvh - 12rem);
 }
 .ui-split-3 > .ui-split-pane {
@@ -2150,12 +2158,6 @@ h1 {
     display: flex;
     flex-direction: column;
   }
-  .agent-flow {
-    display: none;
-  }
-  .agent-graph {
-    min-height: 0;
-  }
   .file-tree {
     max-height: 250px;
     overflow: auto;
@@ -2533,22 +2535,101 @@ h1 {
   color: var(--primary);
   font-weight: 400;
 }
-.chat-tool {
+/* Consecutive tool calls folded into one line (like Claude Code): what the agent does now, a spinner and a timer
+   while it works, every step on expand. */
+.tool-group {
+  width: 100%;
   max-width: 780px;
-  margin: 0 auto 0.65rem;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--muted);
-  font-size: 0.82rem;
+  margin: 0 auto 0.5rem;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
 }
-.chat-tool summary {
+.chat-feed .tool-group {
+  max-width: none;
+  margin: 0 0 0.5rem;
+}
+.tool-group > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.3rem 0.1rem;
   cursor: pointer;
+  list-style: none;
+  border-radius: 6px;
 }
-.chat-tool pre {
-  margin: 0.5rem 0 0;
+.tool-group > summary::-webkit-details-marker {
+  display: none;
+}
+.tool-group > summary::after {
+  content: '▸';
+  color: var(--muted);
+  font-size: 0.75rem;
+  transition: transform 120ms ease-out;
+}
+.tool-group[open] > summary::after {
+  transform: rotate(90deg);
+}
+.tool-group > summary:hover {
+  color: var(--text);
+}
+.tool-group-mark {
+  display: inline-block;
+  width: 1ch;
+  color: var(--muted);
+  text-align: center;
+}
+.tool-group.is-running .tool-group-mark {
+  color: var(--accent);
+}
+.tool-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-group.is-running .tool-group-label {
+  color: var(--text);
+}
+.tool-group-count,
+.tool-group-time {
+  flex: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tool-group-failed {
+  flex: none;
+  color: var(--status-error);
+}
+.tool-group-steps {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.5rem 1.4rem;
+  padding: 0 0 0 0.75rem;
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+.tool-group-steps li {
+  display: grid;
+  gap: 0.25rem;
+}
+.tool-group-steps li.is-failed > span {
+  color: var(--status-error);
+}
+.tool-group-steps pre {
+  max-height: 16rem;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 0.78rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool-group > summary::after {
+    transition: none;
+  }
 }
 .thinking {
   display: flex;
@@ -2825,12 +2906,25 @@ h1 {
   }
 }
 
-/* Chats: the conversation is exactly one viewport tall; only the message list scrolls,
-   the composer stays pinned at the bottom (orchestrator fix 24.10). */
-.chats-shell {
-  height: calc(100dvh - var(--topbar-height, 68px) - 2.5rem);
-  min-height: 420px;
-  margin: calc(-1 * clamp(1.25rem, 3vw, 3rem) + 1rem) calc(-1 * clamp(1rem, 4vw, 4rem) + 1rem) 0;
+/* Chats: a panel inside the page's padding like every other section, exactly as tall as the space under the
+   topbar; only the message list scrolls, the composer stays pinned at the bottom. */
+@media (min-width: 901px) {
+  .app-shell:has(.chats-shell) {
+    height: 100dvh;
+  }
+  .content:has(> .chats-shell) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .chats-shell {
+    flex: 1;
+    height: auto;
+    min-height: 420px;
+    margin: 0;
+    border-radius: var(--radius-lg);
+  }
 }
 .chat-conversation {
   display: flex;
@@ -2998,9 +3092,6 @@ h1 {
   color: var(--status-error);
   background: color-mix(in srgb, var(--status-error) 14%, transparent);
 }
-.session-list-item {
-  cursor: pointer;
-}
 .session-list-item .icon-delete {
   opacity: 0.55;
 }
@@ -3050,6 +3141,23 @@ h1 {
   background: var(--bg-canvas);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+.session-terminal-screen,
+.session-terminal-screen .xterm,
+.session-terminal-screen .xterm-viewport,
+.session-terminal-screen .xterm-screen {
+  min-width: 0;
+  max-width: 100%;
+}
+.session-terminal-screen .xterm {
+  width: 100%;
+  overflow: hidden;
+}
+.session-terminal-screen .xterm-rows > div {
+  max-width: 100%;
+}
+.session-terminal-screen .xterm-screen {
+  overflow: hidden;
 }
 @media (max-width: 640px) {
   .session-terminal-screen {
@@ -3119,9 +3227,44 @@ h1 {
     height: auto;
   }
 }
-/* Session column without an outer scroll (desktop): header lines on top, the tabbed area takes the
+/* Session column without an outer scroll (desktop and phone): header lines on top, the tabbed area takes the
    rest, the message box sits at the bottom; only the chat, events and terminals scroll inside. */
-@media (min-width: 768px) {
+@media (max-width: 767px) {
+  /* A phone shows one pane at a time (the section tabs): it fills the grid, the heading stays compact. */
+  .workspace-heading .eyebrow,
+  .workspace-heading > div > .muted {
+    display: none;
+  }
+  .workspace-heading {
+    align-items: center;
+    flex-wrap: nowrap;
+    margin-bottom: 0.5rem;
+  }
+  .workspace-heading h1 {
+    font-size: 1.35rem;
+  }
+  .workspace-tabs {
+    margin-bottom: 0.5rem;
+  }
+  .workspace-grid.ui-split-2 {
+    overflow: hidden;
+  }
+  .workspace-grid.ui-split-2 > .ui-split-pane {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace-grid.ui-split-2 > .ui-split-pane > * {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+  .session-terminal-tabs .session-terminal-screen {
+    min-height: 14rem;
+  }
+}
+@media (min-width: 0) {
   .workspace-grid.ui-split-2 > .ui-split-pane > main.workspace-center {
     display: flex;
     flex-direction: column;
@@ -3160,6 +3303,25 @@ h1 {
   .session-terminal-tabs > .session-terminal-extra {
     height: auto;
     overflow: auto;
+  }
+}
+@media (max-width: 767px) {
+  /* The session header lines and the output do not fit a phone screen together: the session pane scrolls as a
+     whole and the message box stays pinned to its bottom, always reachable. */
+  .workspace-grid.ui-split-2 > .ui-split-pane > main.workspace-center,
+  .workspace-center > .session-workspace {
+    overflow-y: auto;
+  }
+  .workspace-center > .session-workspace {
+    flex: none;
+    min-height: 100%;
+  }
+  .session-workspace > .chat-form {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: var(--surface);
+    padding-bottom: 0.25rem;
   }
 }
 .chat-message-text {
@@ -3277,7 +3439,6 @@ body,
   background: var(--bg-canvas);
 }
 body {
-  overflow-x: hidden;
   font-size: 0.875rem;
   line-height: 1.45;
 }
@@ -3355,6 +3516,7 @@ button:disabled {
 }
 .app-shell {
   grid-template-columns: 14.5rem minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--bg-canvas);
 }
 .topbar {
@@ -3375,7 +3537,7 @@ button:disabled {
   color: var(--text-secondary);
 }
 .nav {
-  min-height: calc(100dvh - 4rem);
+  min-height: 0;
   padding: 0.8rem 0.65rem;
   background: var(--bg-surface);
   border-right: 1px solid var(--border-subtle);
@@ -3723,6 +3885,9 @@ h1 {
   }
   .nav-links {
     display: none;
+    position: static;
+    width: 100%;
+    max-width: 100%;
     max-height: calc(100dvh - 8rem);
     overflow-y: auto;
   }
@@ -3738,6 +3903,14 @@ h1 {
   .content {
     min-height: 0;
     padding: 1rem 0.8rem 2rem;
+  }
+  .app-shell,
+  .content,
+  .nav,
+  .nav-links,
+  .chats-shell,
+  .workspace-grid {
+    max-width: 100%;
   }
   .page-heading {
     align-items: flex-start;
@@ -3867,13 +4040,17 @@ h1 {
 .ui-split-collapse {
   position: absolute;
   top: 0.75rem;
-  right: 0.75rem;
+  right: calc(0.75rem + var(--pane-scrollbar, 0px));
   z-index: 2;
   width: 1.9rem;
   min-height: 1.9rem;
   padding: 0;
   font-size: 1.1rem;
   line-height: 1;
+}
+/* The first heading of a foldable pane leaves room for the fold button. */
+.ui-split-pane:has(> .ui-split-collapse) > :last-child > :first-child > .panel-heading:first-child {
+  padding-right: 2.25rem;
 }
 .ui-split-collapsed .ui-split-handle {
   pointer-events: none;
@@ -4589,4 +4766,584 @@ h1 {
 }
 .task-status-cancelled {
   --task-tone: var(--status-error);
+}
+
+/* Windows app without the native frame: the topbar is the title bar, the window buttons sit flush at its
+   right edge (Windows 11 caption buttons: neutral, quiet hover, red close). */
+.topbar-frameless {
+  padding-right: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.topbar-frameless .account-name b {
+  pointer-events: none; /* the drag region is the span itself */
+}
+.window-controls {
+  display: flex;
+  align-self: stretch;
+  margin: -0.75rem 0 -0.75rem 0.25rem;
+}
+.window-controls button {
+  display: grid;
+  place-items: center;
+  width: 2.875rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+  transition:
+    background-color 100ms ease-out,
+    color 100ms ease-out;
+}
+.window-controls svg {
+  width: 0.625rem;
+  height: 0.625rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.window-controls button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-color: transparent;
+}
+.window-controls button:active:not(:disabled) {
+  transform: none;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--muted);
+}
+.window-controls .window-close:hover:not(:disabled) {
+  background: #c42b1c;
+  color: #fff;
+}
+.window-controls .window-close:active:not(:disabled) {
+  background: color-mix(in srgb, #c42b1c 90%, transparent);
+  color: color-mix(in srgb, #fff 70%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .window-controls button {
+    transition: none;
+  }
+}
+
+/* Statistics: tiles, stacked daily columns by model, tables. Series colors are the validated categorical
+   slots in fixed order (dark steps by default, light steps under the light theme); slot 0 is "Other". */
+.stats-page {
+  --series-0: #8a8984;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+}
+:root[data-theme='light'] .stats-page {
+  --series-0: #8a8984;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+}
+.stats-periods {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.6rem);
+  background: var(--surface);
+}
+.stats-periods button {
+  min-height: 2rem;
+  padding: 0.3rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.stats-periods button.active {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.stats-tile {
+  display: grid;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+}
+.stats-tile > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.stats-tile strong {
+  font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.stats-note {
+  margin: -0.25rem 0 1rem;
+  font-size: 0.82rem;
+}
+.stats-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.stats-legend span,
+.stats-tooltip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.stats-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 2px;
+  background: currentColor;
+  flex: none;
+}
+.stats-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.stats-chart {
+  padding: 1rem 1.1rem;
+  min-width: 0;
+}
+.stats-chart-frame {
+  position: relative;
+  height: 220px;
+}
+.stats-chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.stats-grid-line line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.stats-grid-line text,
+.stats-axis-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.stats-hit {
+  fill: transparent;
+}
+rect.stats-series-0,
+i.stats-series-0 {
+  fill: var(--series-0);
+  color: var(--series-0);
+}
+rect.stats-series-1,
+i.stats-series-1 {
+  fill: var(--series-1);
+  color: var(--series-1);
+}
+rect.stats-series-2,
+i.stats-series-2 {
+  fill: var(--series-2);
+  color: var(--series-2);
+}
+rect.stats-series-3,
+i.stats-series-3 {
+  fill: var(--series-3);
+  color: var(--series-3);
+}
+rect.stats-series-4,
+i.stats-series-4 {
+  fill: var(--series-4);
+  color: var(--series-4);
+}
+.stats-chart rect[class^='stats-series'] {
+  transition: opacity 120ms ease-out;
+}
+.stats-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.3rem;
+  width: max-content;
+  max-width: 22rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 0.6rem);
+  background: var(--surface-raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  font-size: 0.78rem;
+  pointer-events: none;
+  z-index: 2;
+}
+.stats-tooltip span {
+  white-space: nowrap;
+}
+.stats-tooltip b {
+  margin-left: auto;
+  padding-left: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.stats-tooltip-total {
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+.stats-table {
+  padding: 1rem 1.1rem;
+}
+.stats-table-scroll {
+  overflow: auto;
+}
+.stats-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-raised, var(--surface));
+}
+.stats-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.stats-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-align: right;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.stats-table td {
+  text-align: right;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stats-table :is(th, td):first-child {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.stats-share {
+  display: inline-block;
+  width: 4rem;
+  height: 0.35rem;
+  margin-right: 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  vertical-align: middle;
+  overflow: hidden;
+}
+.stats-share span {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+}
+.stats-empty {
+  padding: 2rem;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stats-chart rect[class^='stats-series'] {
+    transition: none;
+  }
+}
+
+/* Desktop: the statistics page is exactly one screen — heading, tiles and the legend take what they need,
+   the charts and the breakdown table share the rest; only the table scrolls, inside its panel. */
+@media (min-width: 901px) {
+  .app-shell:has(.stats-page) {
+    height: 100dvh;
+  }
+  .content:has(> .stats-page) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .stats-page {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .stats-page > .page-heading {
+    margin-bottom: 1rem;
+  }
+  .stats-tiles {
+    margin-bottom: 0.75rem;
+  }
+  .stats-tile {
+    padding: 0.8rem 1.1rem;
+  }
+  .stats-charts {
+    flex: 1 1 0;
+    min-height: 170px;
+    margin-bottom: 0.75rem;
+  }
+  .stats-chart {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .stats-chart-frame {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+  }
+  .stats-table {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+  }
+  .stats-table-scroll {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+/* Statistics heading: section tabs and the period, side by side. */
+.stats-heading-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Efficiency tab: filters, six KPIs, three charts, then tasks with observations — one screen on a desktop. */
+.efficiency-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.efficiency-filters select {
+  min-width: 0;
+  width: 100%;
+}
+.efficiency-tiles {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+}
+.efficiency-tiles strong {
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+}
+.efficiency-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.efficiency-trend {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.efficiency-trend > select {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.8rem;
+  z-index: 1;
+  width: auto;
+  min-height: 0;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+.efficiency-trend > .stats-chart {
+  flex: 1;
+}
+.efficiency-roles,
+.efficiency-triggers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow: auto;
+}
+.efficiency-split {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+}
+.efficiency-split-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.75rem;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+.efficiency-split-bar i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+.efficiency-split-bar i[class*='stats-series-'] {
+  background: var(--series-1);
+}
+.efficiency-split-bar i.stats-series-2 {
+  background: var(--series-2);
+}
+.efficiency-split-bar i.stats-series-3 {
+  background: var(--series-3);
+}
+.efficiency-mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.efficiency-mini td {
+  padding: 0.3rem 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.efficiency-mini td:not(:first-child) {
+  text-align: right;
+}
+.efficiency-mini .stats-swatch {
+  display: inline-block;
+  vertical-align: middle;
+}
+.efficiency-context {
+  margin: auto 0 0;
+  font-size: 0.76rem;
+}
+.efficiency-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: 1rem;
+}
+.efficiency-tasks .panel-heading,
+.efficiency-observations .panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.efficiency-tasks .panel-heading input {
+  max-width: 16rem;
+  min-height: 0;
+  padding: 0.35rem 0.6rem;
+}
+.efficiency-row {
+  cursor: pointer;
+}
+.efficiency-row:hover td {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.efficiency-task-link,
+.efficiency-sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  min-height: 0;
+}
+.efficiency-task-link {
+  font-weight: 600;
+}
+.efficiency-sort {
+  color: var(--muted);
+  font-weight: 600;
+}
+.efficiency-sort:hover:not(:disabled),
+.efficiency-task-link:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
+}
+.efficiency-observations ul {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.efficiency-observations li {
+  display: grid;
+  gap: 0.2rem;
+}
+.ui-dialog.efficiency-detail {
+  width: min(64rem, calc(100vw - 2rem));
+}
+.efficiency-detail .stats-tiles {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin: 0;
+}
+.efficiency-detail-body {
+  display: grid;
+  gap: 1rem;
+}
+.efficiency-detail-body h3 {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+}
+.efficiency-detail-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.efficiency-detail-body th,
+.efficiency-detail-body td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  white-space: nowrap;
+}
+.efficiency-warnings {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+@media (min-width: 901px) {
+  .stats-page:has(.efficiency-charts) .efficiency-charts {
+    flex: 1 1 0;
+    min-height: 170px;
+  }
+  .efficiency-bottom {
+    flex: 1 1 0;
+    min-height: 180px;
+  }
+  .efficiency-bottom > .stats-table {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .efficiency-bottom .stats-table-scroll {
+    flex: 1;
+    min-height: 0;
+  }
+}
+@media (max-width: 1100px) {
+  .efficiency-charts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .efficiency-trend {
+    grid-column: 1 / -1;
+    min-height: 220px;
+  }
+}
+@media (max-width: 900px) {
+  .efficiency-charts,
+  .efficiency-bottom {
+    grid-template-columns: 1fr;
+  }
 }

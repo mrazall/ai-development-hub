@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from sqlalchemy import select
 
+from ..analytics.runs import create_run, latest_run, update_run
 from ..auth import bearer, current_principal, current_user, db_dep, write_user
 from ..config import Settings
 from ..deps import project_or_404
@@ -45,6 +46,13 @@ def _check_engine_matches_account(db, engine: str, account_profile_id: str | Non
         raise HTTPException(422, f"аккаунт {account.id} работает только с движком {expected}, выбран {engine}")
 
 
+def _check_account_on_worker(db, worker_id: str, account_profile_id: str | None) -> None:
+    """A login lives in a profile folder on one machine: another worker could never run the session."""
+    account = db.get(AccountProfile, account_profile_id) if account_profile_id else None
+    if account and account.worker_id and account.worker_id != worker_id:
+        raise HTTPException(422, f"аккаунт {account.id} вошёл на воркере {account.worker_id}, а не на {worker_id}")
+
+
 def _sync_task_status(db, session: Session, status: str) -> None:
     """A task follows its session: in progress while it runs, in review when it finishes (a person checks the
     result). «done» and «cancelled» are the owner's and are never overwritten; an orchestrator's executors do
@@ -64,12 +72,17 @@ def _sync_task_status(db, session: Session, status: str) -> None:
 def create_session(data: SessionIn, user=Depends(write_user), db=Depends(db_dep)):
     project_or_404(db, user, data.project_id)
     _check_engine_matches_account(db, data.engine, data.account_profile_id)
-    session = Session(**data.model_dump(exclude={"hold"}), **({"status": "draft"} if data.hold else {}))
+    _check_account_on_worker(db, data.worker_id, data.account_profile_id)
+    session = Session(**data.model_dump(exclude={"hold", "effort"}), **({"status": "draft"} if data.hold else {}))
+    if data.effort:  # the worker reads it from mcp_config, like a chat's effort
+        session.mcp_config = {**(session.mcp_config or {}), "effort": data.effort}
     if data.permission_mode == "ask" and data.engine == "claude_code" and not session.mcp_config:
         # "Ask" goes through the hub MCP server (its permission tool); the worker exchanges the user id for a
         # short-lived token scoped to this session's permission requests.
         session.mcp_config = {"mcpServers": _mcp_config()["mcpServers"], "user_id": user.id}
     db.add(session)
+    if not data.hold:
+        create_run(db, session, "initial")
     db.commit()
     db.refresh(session)
     return session
@@ -133,7 +146,8 @@ def start_session(session_id: str, user=Depends(write_user), db=Depends(db_dep))
         raise HTTPException(409, "session is not waiting to start")
     session.status = "queued"
     session.status_source = "native"
-    db.add(AgentEvent(session_id=session.id, kind="session.status", source="native", payload={"status": "queued"}))
+    run = create_run(db, session, "initial")
+    db.add(AgentEvent(session_id=session.id, run_id=run.id, kind="session.status", source="native", payload={"status": "queued"}))
     db.commit()
     db.refresh(session)
     return session
@@ -225,7 +239,7 @@ def retry_session(session_id: str, user=Depends(write_user), db=Depends(db_dep))
                    parent_session_id=original.id, account_profile_id=original.account_profile_id,
                    workspace_ref=original.workspace_ref, title=original.title, status="queued",
                    permission_mode=original.permission_mode, mcp_config=original.mcp_config)
-    db.add(copy); db.commit(); db.refresh(copy)
+    db.add(copy); create_run(db, copy, "retry_after_failure" if original.status == "failed" else "continue"); db.commit(); db.refresh(copy)
     return copy
 
 
@@ -315,18 +329,22 @@ def post_events(
             raise HTTPException(404, "session not found")
     elif not is_admin(principal):
         raise HTTPException(403, "admin role required for write operation")
+    # Serialize duplicate checks and run allocation for this session.
+    session = db.scalar(select(Session).where(Session.id == session_id).with_for_update().execution_options(populate_existing=True))
     # A tab that lost its event stream still thinks a finished session is running and posts the
     # message here; nobody would read it, so wake the session up the way /continue does.
     user_message = not isinstance(principal, WorkerToken) and any(
-        item.kind == "message" and item.payload.get("role") == "user" for item in events
+        item.kind == "message" and item.payload.get("role") == "user" and (not item.client_event_id or not db.scalar(select(AgentEvent.cursor).where(AgentEvent.session_id == session_id, AgentEvent.client_event_id == item.client_event_id))) for item in events
     )
     if user_message and session.status in FINISHED_STATUSES:
         if session.role not in {"orchestrator", "executor"} or not session.engine_session_ref:
             raise HTTPException(409, "сессия уже завершена — обновите страницу и отправьте сообщение ещё раз")
+        trigger = "retry_after_failure" if session.status == "failed" and session.resume_at is None else "continue"
         session.resume_at = None
+        run = create_run(db, session, trigger)
         session.status = "queued"
         session.status_source = "native"
-        db.add(AgentEvent(session_id=session.id, kind="session.status", source="native", payload={"status": "queued", "reason": "продолжение"}))
+        db.add(AgentEvent(session_id=session.id, run_id=run.id, kind="session.status", source="native", payload={"status": "queued", "reason": "продолжение"}))
     out = []
     for item in events:
         if item.client_event_id:
@@ -340,7 +358,13 @@ def post_events(
                 out.append(existing)
                 continue
         payload, changed = redact(item.payload)
+        run = latest_run(db, session_id)
+        if run and item.client_event_id:
+            parts = item.client_event_id.split(":")
+            if len(parts) == 3 and parts[0] == session_id and len(parts[1]) <= 64:
+                run.external_run_id = parts[1]
         event = AgentEvent(
+            run_id=run.id if run else None,
             session_id=session_id,
             client_event_id=item.client_event_id,
             kind=item.kind,
@@ -369,6 +393,7 @@ def post_events(
                 # batch: keep the event as history, leave the session status alone.
                 out.append(event)
                 continue
+            update_run(db, run, status, event.ts, payload)
             session.status = status
             session.status_source = item.source
             _sync_task_status(db, session, status)

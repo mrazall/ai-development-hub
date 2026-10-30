@@ -188,6 +188,11 @@ export const STATUS_LABELS: Record<string, string> = {
   draft: t('черновик'),
   ready: t('готово к запуску'),
   idle: t('ничего не запущено'),
+  // Task statuses
+  in_progress: t('в работе'),
+  review: t('на проверке'),
+  done: t('принята'),
+  cancelled: t('отменена'),
 };
 
 export type StatusTone = 'working' | 'success' | 'danger' | 'warning' | 'neutral';
@@ -306,7 +311,7 @@ export function Dialog({
     <dialog
       {...props}
       ref={ref}
-      className="ui-dialog"
+      className={`ui-dialog ${props.className ?? ''}`.trim()}
       aria-modal="true"
       aria-labelledby={titleId}
       onClick={(event) => {
@@ -480,6 +485,26 @@ export function SplitPane({
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
   };
+  // The fold button floats over the first pane's top-right corner; a scrolling pane's scrollbar sits there too,
+  // so the button moves left by the scrollbar's width (0 without a scrollbar or with overlay scrollbars).
+  const firstPane = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = firstPane.current?.lastElementChild as HTMLElement | null | undefined;
+    if (!scroller || folded) return;
+    const measure = () => {
+      const style = getComputedStyle(scroller);
+      const borders = parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+      firstPane.current?.style.setProperty(
+        '--pane-scrollbar',
+        `${Math.max(0, scroller.offsetWidth - scroller.clientWidth - borders)}px`,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    Array.from(scroller.children).forEach((child) => observer.observe(child));
+    return () => observer.disconnect();
+  }, [folded, children]);
   const keyboard = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
       event.preventDefault();
@@ -503,7 +528,7 @@ export function SplitPane({
     >
       {children.length === 2 ? (
         <>
-          <div className="ui-split-pane">
+          <div className="ui-split-pane" ref={firstPane}>
             {folded ? (
               <button
                 className="ui-split-expand"

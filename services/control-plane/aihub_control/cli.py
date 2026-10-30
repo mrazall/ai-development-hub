@@ -32,7 +32,9 @@ def demo_seed(token_file: str) -> None:
         ):
             if not db.get(AccountProfile, profile_id):
                 db.add(AccountProfile(id=profile_id, name=name, kind=kind, worker_id=worker.id,
-                                      config_dir=f"/work/.{profile_id}", models=[]))
+                                      config_dir=f"/work/.{profile_id}", models=[],
+                                      # Mock engines need no login: the profiles are usable as they are.
+                                      status="connected"))
         # Chats answer with the mock engine (repeats the question) — no subscription needed.
         setting = db.get(SystemSetting, "chat_engine") or SystemSetting(key="chat_engine")
         setting.value, setting.updated_by, setting.updated_at = "mock_echo_prompt", "demo-seed", now

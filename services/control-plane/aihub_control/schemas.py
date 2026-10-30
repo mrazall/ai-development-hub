@@ -90,6 +90,8 @@ class WorkerOut(WorkerIn):
     status: str
     last_heartbeat_at: datetime | None
     worker_token: str | None = None
+    # Sessions starting or running on this worker (the desktop app animates its tray mark while > 0).
+    active_agents: int = 0
 
 
 class PermissionRequestIn(BaseModel):
@@ -116,6 +118,8 @@ class SessionIn(BaseModel):
     title: str | None = None
     context_fresh: bool = False
     permission_mode: Literal["edits", "ask", "auto", "all"] = "edits"
+    # Claude Code --effort / Codex model_reasoning_effort; None — the engine's default.
+    effort: str | None = Field(default=None, pattern=r"^(minimal|low|medium|high|xhigh|max|ultra)$")
 
 
 class SessionOut(SessionIn):

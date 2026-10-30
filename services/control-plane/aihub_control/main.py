@@ -22,9 +22,11 @@ from .routers import orchestrations
 from .routers import terminal
 from .routers import system
 from .routers import orchestration_view
+from .routers import stats
 from .orchestration.lifecycle import purge_expired
 from .orchestration.auto_resume import resume_due
 from .health import collect as collect_health, notify_changes
+from .accounts.auto_limits import queue_limit_refreshes
 from .system_settings import get_setting
 
 settings = Settings()
@@ -36,11 +38,13 @@ async def lifespan(_app):
     retention_task = asyncio.create_task(_retention_loop())
     resume_task = asyncio.create_task(_resume_loop())
     health_task = asyncio.create_task(_health_loop())
+    limits_task = asyncio.create_task(_limits_loop())
     yield
     task.cancel()
     retention_task.cancel()
     resume_task.cancel()
     health_task.cancel()
+    limits_task.cancel()
     try:
         await task
     except asyncio.CancelledError:
@@ -98,6 +102,30 @@ def _health_once() -> int:
         db.close()
 
 
+def _limits_once() -> int:
+    """Queue the periodic limits refresh; returns the interval to wait (it can be changed in the panel)."""
+    _, factory = get_session_factory()
+    db = factory()
+    try:
+        interval = int(get_setting(db, "limits_refresh_s"))
+        if interval > 0:
+            queue_limit_refreshes(db)
+        return interval
+    finally:
+        db.close()
+
+
+async def _limits_loop() -> None:
+    await asyncio.sleep(30)  # let workers come back after a hub restart
+    while True:
+        interval = 60
+        try:
+            interval = await asyncio.to_thread(_limits_once)
+        except Exception as exc:  # a bad tick must not kill the loop
+            print(f"limits refresh failed: {exc}", flush=True)
+        await asyncio.sleep(max(interval, 15) if interval else 60)
+
+
 async def _health_loop() -> None:
     # Failures (worker offline, Tailscale down, stale backups…) become notifications without opening the page.
     await asyncio.sleep(90)  # let workers re-register their heartbeat after a restart
@@ -135,6 +163,7 @@ api.include_router(chats.router)  # personal chat chains
 api.include_router(limits.router)  # account limits
 api.include_router(limits.accounts_router)  # account limits worker endpoints
 api.include_router(orchestrations.router)  # orchestration API
+api.include_router(stats.router)  # token usage and API-equivalent cost
 api.include_router(terminal.router)  # embedded terminal relay (WebSocket)
 
 

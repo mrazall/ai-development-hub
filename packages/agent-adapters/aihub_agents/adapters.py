@@ -375,6 +375,8 @@ class CodexExecAdapter(_JsonLinesAdapter):
         model: str | None = None,
         prompt: str | None = None,
         resume: str | None = None,
+        effort: str | None = None,
+        writable_roots: list[str] | None = None,
     ):
         if resume:
             # `exec resume` has no --cd/--sandbox: the process cwd is the workdir, the sandbox goes via -c.
@@ -386,6 +388,14 @@ class CodexExecAdapter(_JsonLinesAdapter):
             command += ["--sandbox", "workspace-write", "--skip-git-repo-check"]
         if model:
             command += ["-m", model]
+        if effort:  # the model's reasoning level, as Codex /model offers it
+            command += ["-c", f'model_reasoning_effort="{effort}"']
+        # The sandbox stays (writes only in the workdir), but like on a developer's machine: executors run test
+        # servers and Playwright on local ports and reach the test database, and they commit and merge — a
+        # worktree's commits go to the main checkout's .git, which is outside the workdir.
+        command += ["-c", "sandbox_workspace_write.network_access=true"]
+        if writable_roots:
+            command += ["-c", "sandbox_workspace_write.writable_roots=[" + ",".join(f'"{root}"' for root in writable_roots) + "]"]
         if resume:
             command += [resume]
         if prompt:

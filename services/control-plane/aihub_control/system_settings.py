@@ -21,9 +21,9 @@ REGISTRY: dict[str, dict[str, Any]] = {
         "help": "По нему воркеры и MCP агентов обращаются к хабу. Неверный адрес оборвёт связь агентов с хабом.",
     },
     "worker_shell_hint": {
-        "env": "worker_shell_hint", "kind": "text", "group": "Подключение",
+        "env": "worker_shell_hint", "kind": "textarea", "group": "Подключение",
         "label": "Как открыть терминал воркера",
-        "help": "Команда в инструкциях по входу в CLI (например «wsl -d Ubuntu-24.04 -u dev»). Пусто — без команды.",
+        "help": "Воркер сам сообщает, как открыть его терминал (WSL или ssh). Здесь — только если нужно иначе: строка «воркер=команда» (например «pc-wsl=wsl -d Ubuntu-24.04 -u dev»), строка без «=» — для всех воркеров.",
     },
     "chat_system_prompt": {
         "env": "chat_system_prompt", "kind": "textarea", "group": "Чаты",
@@ -51,6 +51,11 @@ REGISTRY: dict[str, dict[str, Any]] = {
         "label": "Модель для внесения черновиков",
         "help": "Например claude-sonnet-5-5.",
     },
+    "model_prices": {
+        "env": "model_prices", "kind": "textarea", "group": "Статистика",
+        "label": "Цены моделей по API, $ за 1 млн токенов",
+        "help": "Для статистики «сколько стоило бы по API», когда движок сам не сообщает цену (Codex). Строка на модель: «модель=вход,кэш,выход», например «gpt-5.6-luna=1.25,0.125,10».",
+    },
     "obsidian_vault": {
         "env": "obsidian_vault", "kind": "text", "group": "База знаний",
         "label": "Имя хранилища Obsidian",
@@ -60,6 +65,11 @@ REGISTRY: dict[str, dict[str, Any]] = {
         "env": "health_interval_s", "kind": "int", "group": "Здоровье",
         "label": "Интервал проверок здоровья, секунд",
         "help": "Как часто проверять систему и слать уведомления о сбоях. 0 — выключено.",
+    },
+    "limits_refresh_s": {
+        "env": "limits_refresh_s", "kind": "int", "group": "Лимиты",
+        "label": "Автообновление лимитов, секунд",
+        "help": "Как часто воркеры читают лимиты подписок командами CLI /usage и /status (лимит не тратится). 0 — только по кнопке.",
     },
 }
 

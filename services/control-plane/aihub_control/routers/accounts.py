@@ -186,6 +186,22 @@ def delete_account(account_id: str, _admin=Depends(write_user), db=Depends(db_de
     db.commit()
 
 
+def worker_shell_hint(value: str | None, worker_id: str) -> str | None:
+    """The command that opens a terminal on *worker_id*: lines `worker=command`, a line without `=` for the rest."""
+    fallback = None
+    for line in (value or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        name, sep, command = line.partition("=")
+        if sep and name.strip() and " " not in name.strip():
+            if name.strip() == worker_id:
+                return command.strip() or None
+        else:
+            fallback = line
+    return fallback
+
+
 @router.post("/{account_id}/login-instructions")
 def login_instructions(account_id: str, _admin=Depends(write_user), db=Depends(db_dep)):
     """Step-by-step login for a subscription profile, run by the owner on the worker's machine."""
@@ -198,7 +214,13 @@ def login_instructions(account_id: str, _admin=Depends(write_user), db=Depends(d
 
     from ..system_settings import get_setting
 
-    open_shell = get_setting(db, "worker_shell_hint") or None
+    # The owner's setting wins; otherwise the worker says how to reach it (WSL distro and user, or ssh).
+    from ..models import WorkerCapability
+
+    capability = db.get(WorkerCapability, account.worker_id)
+    open_shell = worker_shell_hint(get_setting(db, "worker_shell_hint"), account.worker_id) or (
+        capability.shell_hint if capability else None
+    )
     if account.kind == "claude_code_subscription":
         steps = [
             {"text": f"На компьютере с worker-ом «{account.worker_id}» откройте терминал, в котором работает worker.", "command": open_shell},

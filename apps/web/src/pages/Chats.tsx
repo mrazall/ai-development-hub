@@ -10,14 +10,10 @@ import { LogoMark } from '../components/Logo';
 import { CopyButton, QuoteSelection, quoteEvent } from '../components/copy';
 import { Icon } from '../components/ui/icons';
 import { t } from '../i18n';
+import { CLAUDE_MODELS } from '../api/models';
 import { Thinking } from '../components/time';
+import { stepDescription, ToolGroup, toolLabel } from '../components/ToolGroup';
 import { TimeAgo } from '../components/time';
-
-const CLAUDE_MODELS: [string, string][] = [
-  ['claude-opus-5-5', 'Opus 5.5'],
-  ['claude-sonnet-5-5', 'Sonnet 5.5'],
-  ['claude-haiku-5-5', 'Haiku 5.5'],
-];
 
 // Claude Code --effort levels; empty = the worker default (low, to save subscription limits).
 const EFFORTS: [string, string][] = [
@@ -385,11 +381,27 @@ function Conversation({
           setNearBottom(node.scrollHeight - node.scrollTop - node.clientHeight < 80);
         }}
       >
-        {messages.map((message, index) => (
-          <Message key={message.id ?? `${message.role}-${index}`} message={message} />
-        ))}
+        {groupTools(messages).map((item, index, items) =>
+          Array.isArray(item) ? (
+            <ToolGroup
+              key={item[0].id ?? `tools-${index}`}
+              running={(sending || running) && index === items.length - 1}
+              endedAt={(items[index + 1] as ChatMessage | undefined)?.created_at}
+              steps={item.map((step, at) => ({
+                key: step.id ?? at,
+                label: step.tool_summary || toolLabel(step.tool_name),
+                at: step.created_at,
+                detail: step.text ? <pre>{step.text}</pre> : undefined,
+              }))}
+            />
+          ) : (
+            <Message key={item.id ?? `${item.role}-${index}`} message={item} />
+          ),
+        )}
         <QuoteSelection container={scrollRef} />
-        {(sending || running) && <Thinking label={turnLabel(messages)} since={turnStart(messages)} />}
+        {(sending || running) && messages.at(-1)?.role !== 'tool' && (
+          <Thinking label={turnLabel(messages)} since={turnStart(messages)} />
+        )}
         {!nearBottom && (
           <button
             className="jump-latest"
@@ -447,49 +459,40 @@ function mergeMessages(messages: ChatMessage[], events: StreamEvent[], sessionId
       const last = result.at(-1);
       if (last?.partial && last.role === role)
         result[result.length - 1] = { ...last, text, partial: Boolean(payload.partial) };
-      else result.push({ id: `event-${event.cursor}`, role, text, partial: Boolean(payload.partial) });
+      else
+        result.push({
+          id: `event-${event.cursor}`,
+          role,
+          text,
+          partial: Boolean(payload.partial),
+          created_at: event.ts,
+        });
     } else if (event.kind === 'tool.call') {
       result.push({
         id: `tool-${event.cursor}`,
         role: 'tool',
-        text: '',
         tool_name: typeof payload.name === 'string' ? payload.name : t('Инструмент'),
-        tool_summary: typeof payload.summary === 'string' ? payload.summary : '',
+        tool_summary: stepDescription(payload.command),
+        text: typeof payload.summary === 'string' ? payload.summary : '',
+        created_at: event.ts,
       });
     }
   }
   return result;
 }
 
-function toolLabel(name?: string): string {
-  const tool = name ?? '';
-  if (tool.includes('knowledge_search')) return t('Искал в памяти');
-  if (tool.includes('knowledge_read')) return t('Читал заметку');
-  if (tool.includes('knowledge')) return t('Работал с памятью');
-  const labels: Record<string, string> = {
-    Bash: t('Выполнил команду'),
-    Read: t('Прочитал файл'),
-    Edit: t('Изменил файл'),
-    Write: t('Записал файл'),
-    Glob: t('Искал файлы'),
-    Grep: t('Искал в файлах'),
-    WebFetch: t('Открыл страницу'),
-    WebSearch: t('Искал в интернете'),
-  };
-  return labels[tool] ?? (tool || t('Инструмент'));
+/** Consecutive tool calls become one group (a list); other messages stay as they are. */
+function groupTools(messages: ChatMessage[]): (ChatMessage | ChatMessage[])[] {
+  const items: (ChatMessage | ChatMessage[])[] = [];
+  for (const message of messages) {
+    const last = items.at(-1);
+    if (message.role === 'tool' && Array.isArray(last)) last.push(message);
+    else items.push(message.role === 'tool' ? [message] : message);
+  }
+  return items;
 }
 
 function Message({ message }: { message: ChatMessage }): JSX.Element {
-  if (message.role === 'tool')
-    return (
-      <details className="chat-tool">
-        <summary>
-          {toolLabel(message.tool_name)}
-          {message.tool_summary ? `: ${message.tool_summary}` : ''}
-        </summary>
-        {message.text && <pre>{message.text}</pre>}
-      </details>
-    );
   return (
     <article className={`chat-message ${message.role}`}>
       <div className="message-author">

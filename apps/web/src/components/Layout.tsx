@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { arrayOrEmpty, useApi } from '../api/useApi';
 import { useEventStream } from '../api/events';
 import type { Approval, Notification } from '../api/types';
@@ -7,6 +7,7 @@ import { logout } from '../auth/session';
 import { LogoMark } from './Logo';
 import type { User } from '../auth/session';
 import { NavBar } from './NavBar';
+import { useFrameless, WindowControls } from './WindowControls';
 import { IconButton, LangToggle, ThemeToggle } from './ui';
 import { Icon } from './ui/icons';
 import { t } from '../i18n';
@@ -26,6 +27,11 @@ export function Layout({ user }: { user: User }): JSX.Element {
   const location = useLocation();
   const [palette, setPalette] = useState(false);
   const [query, setQuery] = useState('');
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const contentRef = useRef<HTMLElement>(null);
+  const frameless = useFrameless();
+  // In the frameless Windows app the topbar is the title bar: its empty space and plain text drag the window.
+  const drag = frameless ? { 'data-tauri-drag-region': '' } : {};
   const signOut = () => {
     logout();
     navigate('/login');
@@ -41,6 +47,12 @@ export function Layout({ user }: { user: User }): JSX.Element {
   useEffect(() => {
     if (events.some((event) => event.kind === 'notification')) unread.reload();
   }, [events, unread.reload]);
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    if (mobileNavigationOpen) content.setAttribute('inert', '');
+    else content.removeAttribute('inert');
+  }, [mobileNavigationOpen]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -61,21 +73,23 @@ export function Layout({ user }: { user: User }): JSX.Element {
     [query],
   );
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar-brand">
+    <div className={`app-shell${mobileNavigationOpen ? ' mobile-navigation-open' : ''}`}>
+      <header className={`topbar${frameless ? ' topbar-frameless' : ''}`} {...drag}>
+        <div className="topbar-brand" {...drag}>
           <Link to="/workspace" className="brand">
             <LogoMark size={28} className="brand-logo" />
             <span>AI Development Hub</span>
           </Link>
-          <span className="breadcrumb">/ {location.pathname.split('/').filter(Boolean)[0] ?? t('обзор')}</span>
+          <span className="breadcrumb" {...drag}>
+            / {location.pathname.split('/').filter(Boolean)[0] ?? t('обзор')}
+          </span>
         </div>
         <button className="global-search" onClick={() => setPalette(true)} aria-label={t('Открыть палитру команд')}>
           <Icon name="search" size={16} />
           <span>{t('Перейти к странице…')}</span>
           <kbd>⌘ K</kbd>
         </button>
-        <div className="topbar-actions">
+        <div className="topbar-actions" {...drag}>
           <Link className="notification-link" to="/notifications" aria-label={t('Уведомления')}>
             <Icon name="notifications" />
             {arrayOrEmpty(unread.data).length + arrayOrEmpty(approvals.data).length ? (
@@ -84,16 +98,17 @@ export function Layout({ user }: { user: User }): JSX.Element {
           </Link>
           <LangToggle />
           <ThemeToggle />
-          <span className="account-name">
+          <span className="account-name" {...drag}>
             {user.username} · <b>{user.role}</b>
           </span>
           <IconButton label={t('Выйти')} className="button-secondary" onClick={signOut}>
             <Icon name="logout" />
           </IconButton>
         </div>
+        {frameless && <WindowControls />}
       </header>
-      <NavBar />
-      <main className="content">
+      <NavBar onMobileMenuChange={setMobileNavigationOpen} />
+      <main ref={contentRef} className="content">
         {info.data?.demo && (
           <div className="demo-banner" role="note">
             {t(

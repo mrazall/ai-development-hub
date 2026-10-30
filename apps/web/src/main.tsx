@@ -23,11 +23,13 @@ import './style.css';
 // Area styles load after the shared sheet so they can refine it without editing it.
 import './styles/knowledge-projects.css';
 import './styles/settings-mobile.css';
+import './styles/page-geometry.css';
 import { t } from './i18n';
 
 const Workspace = lazy(() => import('./pages/Workspace').then((module) => ({ default: module.Workspace })));
 const Agents = lazy(() => import('./pages/Agents').then((module) => ({ default: module.Agents })));
 const Knowledge = lazy(() => import('./pages/Knowledge').then((module) => ({ default: module.Knowledge })));
+const Stats = lazy(() => import('./pages/Stats').then((module) => ({ default: module.Stats })));
 const SystemSettings = lazy(() =>
   import('./pages/SystemSettings').then((module) => ({ default: module.SystemSettings })),
 );
@@ -69,6 +71,7 @@ function PrivateRoutes(): JSX.Element {
           <Route path="backups" element={<Backups />} />
           <Route path="health" element={<Health />} />
           <Route path="limits" element={<Limits />} />
+          <Route path="stats" element={<Stats />} />
           <Route path="settings" element={<Settings user={user} />} />
           <Route path="settings/accounts" element={<Accounts />} />
           <Route path="settings/mcp" element={<Mcp user={user} />} />

@@ -8,7 +8,12 @@ NOW = datetime(2026, 10, 25, 18, 24, tzinfo=timezone.utc)  # 21:24 in Moscow
 def test_detects_provider_limit_messages():
     assert is_limit_message("You've hit your session limit · resets 12am (Europe/Moscow)")
     assert is_limit_message("You've hit your usage limit. Try again later.")
+    # The window names the CLI used later ("5-hour" was missed once, and the session never resumed).
+    assert is_limit_message("You've hit your 5-hour limit · resets 11:30pm (Europe/Moscow)")
+    assert is_limit_message("You've hit your weekly limit · resets 8pm (Europe/Moscow)")
+    assert is_limit_message("You've hit your Opus weekly limit · resets Nov 4, 7:59pm")
     assert not is_limit_message("Готово: тесты прошли")
+    assert not is_limit_message("I hit your limit of patience with this flaky test")
 
 
 def test_reset_is_the_next_occurrence_in_the_given_zone():

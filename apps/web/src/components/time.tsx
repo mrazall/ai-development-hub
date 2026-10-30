@@ -50,9 +50,9 @@ export function formatElapsed(ms: number): string {
 }
 
 // Claude Code's spinner glyphs: the star grows and shrinks while the model works.
-const GLYPHS = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
+export const GLYPHS = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
 
-function useReducedMotion(): boolean {
+export function useReducedMotion(): boolean {
   const query = typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   const [reduced, setReduced] = useState(Boolean(query?.matches));
   useEffect(() => {

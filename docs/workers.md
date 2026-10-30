@@ -35,7 +35,7 @@ engines always can).
 | `--control-plane` | — | hub URL |
 | `--worker-id`, `--token-file` | — | identity |
 | `--enable-engines` | none | real engines this worker may run: `claude_code`, `codex` |
-| `--max-session-seconds` | 3600 | timeout of a run (orchestrators: `AIHUB_ORCHESTRATOR_MAX_SECONDS`, up to 4 h) |
+| `--max-session-seconds` | 86400 | timeout of a run, at most 24 h (orchestrators: `AIHUB_ORCHESTRATOR_MAX_SECONDS`, also up to 24 h) |
 | `--codeman-url` | — | optional Codeman web terminal on this machine |
 | `AIHUB_WORKER_MAX_PARALLEL` | 6 | sessions at a time |
 | `AIHUB_WORKSPACE_ROOTS` | `~/projects` | where the hub may create project folders (`:`-separated) |
