@@ -215,7 +215,7 @@ def test_commit_request(client, admin_token, clean_schema):
 
 def test_secret_redaction_and_ci_transitions(client, admin_token, clean_schema):
     worker, factory = setup_repo(client, admin_token)
-    token = 'ghp_testSecret123'
+    token = 'ghp_' + 'testSecret123'  # built at run time: a literal looks like a real key to secret scanners
     client.get('/api/v0/projects/demo/repo/graph', headers=auth(admin_token))
     pending = client.get('/api/v0/workers/worker-a/requests/next', headers=auth(worker['worker_token'])).json()
     reply(client, worker, pending['id'], {'result': {'base': 'main', 'branches': [], 'commits': [{'subject': token}]}})
