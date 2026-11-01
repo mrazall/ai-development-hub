@@ -434,3 +434,15 @@ class ExecutionRun(Base):
     waiting_approval_s: Mapped[float | None] = mapped_column(Float)
     waiting_limit_s: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+# --- Repo panel
+class RepoCache(Base):
+    __tablename__ = "repo_cache"
+    __table_args__ = {"schema": "control"}
+    project_id: Mapped[str] = mapped_column(String(63), ForeignKey("control.projects.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(48), primary_key=True)
+    worker_id: Mapped[str | None] = mapped_column(String(128))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    error: Mapped[str | None] = mapped_column(Text)

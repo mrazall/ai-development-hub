@@ -128,5 +128,7 @@ def test_reconstruct_legacy_runs_and_event_attribution(client, admin_token, chan
         runs = runs_for_sessions(db, [sid])[sid]
         assert len(runs) == 2
         assert [run.attribution for run in runs] == ["unknown" if changed else "estimated"] * 2
+        # No run records: the first run started the work, the next one continued it.
+        assert [run.trigger for run in runs] == ["initial", "continue"]
         assert [run_of_event(runs, event.cursor, event.ts).run_index for event in events] == [1, 1, 2, 2, 2]
         assert runs[0].model == (None if changed else "legacy")

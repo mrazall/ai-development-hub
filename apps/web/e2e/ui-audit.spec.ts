@@ -84,6 +84,15 @@ export const ROUTE_CONTRACTS: RouteContract[] = [
     states: ['loading', 'populated', 'error'],
   },
   {
+    id: 'project-repo',
+    path: '/projects/project-fixture/repo',
+    layout: 'graph',
+    scrollOwner: 'panel',
+    allowDocumentYScroll: false,
+    allowDocumentXScroll: false,
+    states: ['loading', 'populated', 'error'],
+  },
+  {
     id: 'tasks',
     path: '/tasks',
     layout: 'table',
@@ -342,6 +351,26 @@ export async function installAuditMocks(page: Page): Promise<void> {
       });
     if (path === '/projects' || path.startsWith('/projects?')) return json([project]);
     if (path === '/projects/project-fixture') return json(project);
+    if (path === '/projects/project-fixture/repo/graph')
+      return json({
+        available: true,
+        refreshing: false,
+        fetched_at: null,
+        branches: [{ name: 'main', head: 'abc1234', agent_session_id: null }],
+        commits: [
+          {
+            sha: 'abc1234',
+            parents: [],
+            subject: 'Fixture commit',
+            author: 'Author',
+            at: '2026-01-01T00:00:00Z',
+            refs: ['main'],
+          },
+        ],
+        has_more: false,
+      });
+    if (path === '/projects/project-fixture/repo/github')
+      return json({ available: true, refreshing: false, fetched_at: null, pulls: [], runs: [] });
     if (path.endsWith('/tasks')) return json([]);
     if (path === '/workers' || path.startsWith('/workers?')) return json([worker]);
     if (path === '/workers/worker-fixture') return json(worker);

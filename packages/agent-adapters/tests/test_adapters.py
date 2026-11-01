@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from aihub_agents.adapters import (
+    HEADLESS_RULES,
     ClaudeCodeAdapter,
     CodexExecAdapter,
     MockAdapter,
@@ -73,7 +74,8 @@ def test_claude_command_is_workspace_scoped_and_uses_accept_edits(tmp_path):
     adapter = ClaudeCodeAdapter("/profile", tmp_path, "sonnet", "Update README")
     assert adapter.command == [
             "claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-        "--permission-mode", "acceptEdits", "--effort", "low", "--model", "sonnet", "--", "Update README",
+        "--permission-mode", "acceptEdits", "--effort", "low", "--model", "sonnet",
+        "--append-system-prompt", HEADLESS_RULES, "--", "Update README",
     ]
     assert adapter.workdir == str(tmp_path)
     assert "--dangerously-skip-permissions" not in adapter.command
@@ -91,6 +93,8 @@ def test_claude_chat_command_uses_session_mcp_without_token_in_argv(tmp_path):
     assert "mcp__knowledge" in adapter.command
     assert "scoped-secret" not in adapter.command
     assert adapter.extra_env["AIHUB_HUB_TOKEN"] == "scoped-secret"
+    # The session's own prompt comes after the worker's rule against self-matching wait loops.
+    assert adapter.command[adapter.command.index("--append-system-prompt") + 1] == f"{HEADLESS_RULES}\n\nsearch memory first"
 
 
 def test_prompts_are_never_parsed_as_flags():
@@ -181,7 +185,7 @@ def test_claude_resume_is_before_prompt_separator(tmp_path):
     assert adapter.command == [
             "claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
         "--permission-mode", "acceptEdits", "--effort", "low", "--model", "sonnet", "--resume", "claude-123",
-        "--", "--looks-like-a-flag",
+        "--append-system-prompt", HEADLESS_RULES, "--", "--looks-like-a-flag",
     ]
 
 

@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { ErrorBanner, Loading, StatusBadge, Button } from '../components/ui';
 import { ProjectLifecycle } from '../components/ProjectLifecycle';
 import { t } from '../i18n';
+import { ProjectTabs } from './project/Repo';
 type Project = {
   id: string;
   name: string;
@@ -49,6 +50,9 @@ export function ProjectDetail(): JSX.Element {
           <p className="muted">{project.id}</p>
         </div>
         <div className="project-detail-actions">
+          <Link className="ui-button ui-button-secondary" to={`/projects/${project.id}/instructions`}>
+            {t('Инструкции агентов')}
+          </Link>
           <StatusBadge value={project.visibility} />
           <ProjectLifecycle
             project={project}
@@ -56,6 +60,7 @@ export function ProjectDetail(): JSX.Element {
           />
         </div>
       </div>
+      <ProjectTabs id={project.id} repo={false} />
       <div className="detail-grid">
         <section className="panel">
           <h2>{t('Настройки')}</h2>

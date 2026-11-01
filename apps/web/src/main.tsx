@@ -6,6 +6,7 @@ import { useSession } from './auth/session';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { ProjectDetail } from './pages/ProjectDetail';
+import { Repo } from './pages/project/Repo';
 import { Projects } from './pages/Projects';
 import { SessionDetail } from './pages/SessionDetail';
 import { Sessions } from './pages/Sessions';
@@ -14,6 +15,7 @@ import { Tasks } from './pages/Tasks';
 import { Notifications } from './pages/Notifications';
 import { SessionFiles } from './pages/SessionFiles';
 import { Workers } from './pages/Workers';
+import { ProjectInstructions, WorkerInstructions } from './pages/Instructions';
 import { Accounts } from './pages/Accounts';
 import { Mcp } from './pages/Mcp';
 import { Backups } from './pages/Backups';
@@ -60,6 +62,8 @@ function PrivateRoutes(): JSX.Element {
           <Route path="agents" element={<Agents />} />
           <Route path="projects" element={<Projects user={user} />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
+          <Route path="projects/:id/instructions" element={<ProjectInstructions />} />
+          <Route path="projects/:id/repo" element={<Repo />} />
           <Route path="tasks" element={<Tasks user={user} />} />
           <Route path="workers" element={<Workers user={user} />} />
           <Route path="sessions" element={<Sessions />} />
@@ -77,6 +81,7 @@ function PrivateRoutes(): JSX.Element {
           <Route path="settings/mcp" element={<Mcp user={user} />} />
           <Route path="settings/projects" element={<Projects user={user} />} />
           <Route path="settings/workers" element={<Workers user={user} />} />
+          <Route path="settings/workers/:id/instructions" element={<WorkerInstructions />} />
           <Route path="settings/sessions" element={<Sessions />} />
           <Route path="settings/users" element={<Settings user={user} />} />
           <Route path="settings/system" element={<SystemSettings />} />

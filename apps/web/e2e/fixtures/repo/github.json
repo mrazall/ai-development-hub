@@ -1,0 +1,96 @@
+{
+  "fetched_at": "2026-10-30T12:00:00Z",
+  "refreshing": false,
+  "worker_id": "worker-fixture",
+  "available": true,
+  "reason": null,
+  "pulls": [
+    {
+      "number": 14,
+      "title": "Improve dashboard",
+      "author": "developer",
+      "branch": "feature-14",
+      "base": "main",
+      "draft": false,
+      "mergeable": true,
+      "review": "approved",
+      "checks": {
+        "state": "success",
+        "passed": 3,
+        "failed": 0,
+        "pending": 0
+      },
+      "url": "https://github.com/example/repo/pull/14",
+      "updated_at": "2026-10-30T12:00:00Z"
+    },
+    {
+      "number": 12,
+      "title": "Fix authentication",
+      "author": "developer",
+      "branch": "feature-12",
+      "base": "main",
+      "draft": false,
+      "mergeable": true,
+      "review": "approved",
+      "checks": {
+        "state": "failure",
+        "passed": 3,
+        "failed": 1,
+        "pending": 0
+      },
+      "url": "https://github.com/example/repo/pull/12",
+      "updated_at": "2026-10-30T12:00:00Z"
+    }
+  ],
+  "runs": [
+    {
+      "id": 103,
+      "workflow": "Running CI",
+      "branch": "main",
+      "event": "push",
+      "status": "in_progress",
+      "conclusion": null,
+      "started_at": "2026-10-30T12:00:00Z",
+      "duration_s": null,
+      "url": "https://github.com/example/repo/actions/runs/103",
+      "jobs": []
+    },
+    {
+      "id": 102,
+      "workflow": "Successful CI",
+      "branch": "main",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-30T11:00:00Z",
+      "duration_s": 80,
+      "url": "https://github.com/example/repo/actions/runs/102",
+      "jobs": []
+    },
+    {
+      "id": 101,
+      "workflow": "Failed CI",
+      "branch": "main",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-10-30T10:00:00Z",
+      "duration_s": 200,
+      "url": "https://github.com/example/repo/actions/runs/101",
+      "jobs": [
+        {
+          "name": "Tests",
+          "conclusion": "failure",
+          "duration_s": 80,
+          "url": "https://github.com/example/repo/actions/runs/101/job/1"
+        },
+        {
+          "name": "Lint",
+          "conclusion": "success",
+          "duration_s": 45,
+          "url": "https://github.com/example/repo/actions/runs/101/job/2"
+        }
+      ]
+    }
+  ]
+}

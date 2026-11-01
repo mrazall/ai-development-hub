@@ -30,8 +30,10 @@ from .adapters import (
     ensure_allowed_workdir,
 )
 from .mcp_config import write_claude_session_config, write_session_config
+from .repo import clean_error, repo_action, repo_commit, repo_github, repo_graph
 from .rate_limits import latest_codex_rollout_rate_limits
 from .usage_probe import probe_limits
+from .instructions import handle as handle_instructions
 from .workspace import (
     commit_worktree,
     execute_request,
@@ -52,6 +54,7 @@ class Worker:
         self.enabled_engines = enabled_engines or set()
         self.max_session_seconds = max_session_seconds
         self._limits_lock = asyncio.Lock()
+        self._repo_lock = asyncio.Lock()
         self._background: set[asyncio.Task] = set()
         self.headers = {"Authorization": f"Bearer {token}"}
         self._active_adapters: set[Any] = set()
@@ -280,8 +283,9 @@ class Worker:
                             task = asyncio.create_task(self.run_assignment(client, assignment))
                             self._running[key] = task
                             task.add_done_callback(lambda _task, key=key: self._running.pop(key, None))
-                    await self.service_workspace_request(client)
-                    await asyncio.sleep(5)
+                    # Right after a request the next one is taken at once (an editor in the panel waits for it).
+                    served = await self.service_workspace_request(client)
+                    await asyncio.sleep(0.3 if served else 5)
             finally:
                 heartbeat_task.cancel()
                 if terminal_task:
@@ -291,19 +295,24 @@ class Worker:
                 if self._running:
                     await asyncio.gather(*self._running.values(), return_exceptions=True)
 
-    async def service_workspace_request(self, client: httpx.AsyncClient) -> None:
+    async def service_workspace_request(self, client: httpx.AsyncClient) -> bool:
         response = await self._request(
             client, "GET", f"/api/v0/workers/{self.worker_id}/requests/next", headers=self.headers
         )
         if response is None or not response.is_success or not response.json():
-            return
+            return False
         request = response.json()
+        if request.get("kind") in {"repo_graph", "repo_commit", "repo_github", "repo_action"}:
+            task = asyncio.create_task(self._repo_request_serially(client, request))
+            self._background.add(task)
+            task.add_done_callback(self._background.discard)
+            return
         if request.get("kind") == "limits_refresh":
             # 10–20 s of a CLI in a pseudo-terminal: in the background, one at a time, so sessions start meanwhile.
             task = asyncio.create_task(self._refresh_limits_serially(client, request))
             self._background.add(task)
             task.add_done_callback(self._background.discard)
-            return
+            return True
         try:
             if request.get("kind") == "account_adopt_login":
                 result = await asyncio.to_thread(_adopt_found_login, request)
@@ -316,6 +325,8 @@ class Worker:
                 result = await asyncio.to_thread(
                     merge_branch, request["workdir"], request.get("path") or "", str(params.get("base_branch") or "main")
                 )
+            elif request.get("kind") == "instructions":
+                result = await asyncio.to_thread(handle_instructions, request.get("response") or {})
             elif request.get("kind") == "mkdir":
                 result = await asyncio.to_thread(make_project_dir, request.get("path") or "", self.workspace_roots)
             else:
@@ -323,12 +334,35 @@ class Worker:
                     execute_request, request["workdir"], request["kind"], request.get("path")
                 )
             payload = {"result": result}
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
             payload = {"error": str(exc)[:500]}
         await self._request(
             client, "POST", f"/api/v0/workers/{self.worker_id}/requests/{request['id']}/response",
             headers=self.headers, json=payload,
         )
+        return True
+
+    async def _repo_request_serially(self, client: httpx.AsyncClient, request: dict[str, Any]) -> None:
+        async with self._repo_lock:
+            try:
+                params = request.get("response") or {}
+                path = os.path.expanduser(request["path"] or "")
+                kind = request["kind"]
+                if kind == "repo_graph":
+                    result = await asyncio.to_thread(repo_graph, path, params.get("limit", 200))
+                elif kind == "repo_commit":
+                    result = await asyncio.to_thread(repo_commit, path, params.get("sha"))
+                elif kind == "repo_github":
+                    result = await asyncio.to_thread(repo_github, path, self.worker_id)
+                else:
+                    result = await asyncio.to_thread(repo_action, path, params.get("action"), params.get("target"))
+                payload = {"result": result}
+            except Exception as exc:  # noqa: BLE001 - every request must receive an error
+                payload = {"error": clean_error(exc)}
+            await self._request(
+                client, "POST", f"/api/v0/workers/{self.worker_id}/requests/{request['id']}/response",
+                headers=self.headers, json=payload,
+            )
 
     async def _check_one_account_status(self, client: httpx.AsyncClient, account_id: str) -> None:
         response = await self._request(

@@ -222,7 +222,7 @@ function StatusGlyph({ tone }: { tone: StatusTone }): JSX.Element {
   return <span className="status-dot" />;
 }
 
-export function StatusBadge({ value: raw }: { value: string | null | undefined }): JSX.Element {
+export function StatusBadge({ value: raw, label }: { value: string | null | undefined; label?: string }): JSX.Element {
   const value = raw || 'unknown';
   const tone = statusTone(value);
   return (
@@ -230,7 +230,7 @@ export function StatusBadge({ value: raw }: { value: string | null | undefined }
       <span className="status-glyph" aria-hidden="true">
         <StatusGlyph tone={tone} />
       </span>
-      {statusLabel(value)}
+      {label ?? statusLabel(value)}
     </span>
   );
 }

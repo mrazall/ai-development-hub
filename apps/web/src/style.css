@@ -5347,3 +5347,241 @@ i.stats-series-4 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Agent instructions: the file list and the editor, one screen on a desktop (each scrolls inside itself). */
+.instructions-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  gap: 1rem;
+}
+.instructions-files {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1rem;
+  overflow: auto;
+}
+.instructions-files h2 {
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.instructions-files ul {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.instructions-files li > button {
+  display: grid;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  font-weight: 500;
+}
+.instructions-files li > button.active {
+  border-color: var(--line);
+  background: var(--surface-soft);
+}
+.instructions-file-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.instructions-dirty {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.instructions-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+  min-height: 0;
+  padding: 1rem;
+}
+.instructions-empty {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 12rem;
+}
+.instructions-editor-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.instructions-editor-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.instructions-error,
+.instructions-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.instructions-error {
+  background: color-mix(in srgb, var(--status-error) 14%, transparent);
+}
+.instructions-notice {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+.instructions-code {
+  display: flex;
+  flex: 1;
+  min-height: 16rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.instructions-gutter {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0.5rem;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+}
+.instructions-gutter,
+.instructions-code textarea {
+  font: 0.82rem/1.5 var(--font-mono);
+}
+.instructions-code textarea {
+  flex: 1;
+  min-height: 0;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  white-space: pre;
+  overflow: auto;
+}
+.instructions-code textarea:focus-visible {
+  outline: none;
+}
+.instructions-preview {
+  flex: 1;
+  min-height: 16rem;
+  padding: 0.75rem 1rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.instructions-editor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.instructions-editor-foot small {
+  margin-right: auto;
+}
+.instructions-size-warn {
+  color: var(--status-error);
+}
+.ui-dialog.instructions-dialog {
+  width: min(56rem, calc(100vw - 2rem));
+}
+.instructions-diff pre {
+  max-height: 55vh;
+  margin: 0.75rem 0;
+  padding: 0.6rem 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.8rem/1.5 var(--font-mono);
+}
+.instructions-diff span {
+  display: block;
+  padding: 0 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.instructions-diff .is-added {
+  background: color-mix(in srgb, var(--status-success) 16%, transparent);
+}
+.instructions-diff .is-removed {
+  background: color-mix(in srgb, var(--status-error) 16%, transparent);
+}
+.instructions-skill-form {
+  display: grid;
+  gap: 0.9rem;
+}
+.instructions-skill-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+.instructions-history {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.instructions-history summary {
+  cursor: pointer;
+}
+@media (min-width: 901px) {
+  .app-shell:has(.instructions-page) {
+    height: 100dvh;
+  }
+  .content:has(> .instructions-page) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .instructions-page {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .instructions-layout {
+    flex: 1;
+    min-height: 0;
+  }
+}
+@media (max-width: 900px) {
+  .instructions-layout {
+    grid-template-columns: 1fr;
+  }
+  .instructions-code,
+  .instructions-preview {
+    min-height: 20rem;
+  }
+}
+
+.workspace-project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 4px 0 14px;
+  font-size: 0.9rem;
+}

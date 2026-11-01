@@ -1,0 +1,139 @@
+{
+  "fetched_at": "2026-10-30T12:00:00Z",
+  "refreshing": false,
+  "worker_id": "worker-fixture",
+  "available": true,
+  "reason": null,
+  "base": "main",
+  "has_more": false,
+  "branches": [
+    {
+      "name": "main",
+      "head": "000000000000000000000000000000000000000c",
+      "is_remote": false,
+      "ahead": 0,
+      "behind": 0,
+      "agent_session_id": null,
+      "agent_session_title": null,
+      "merged": true
+    },
+    {
+      "name": "aihub/session-fixture/feature",
+      "head": "000000000000000000000000000000000000000a",
+      "is_remote": false,
+      "ahead": 0,
+      "behind": 0,
+      "agent_session_id": "session-fixture",
+      "agent_session_title": "Fix login",
+      "merged": true
+    },
+    {
+      "name": "origin/main",
+      "head": "000000000000000000000000000000000000000c",
+      "is_remote": true,
+      "ahead": 0,
+      "behind": 0,
+      "agent_session_id": null,
+      "agent_session_title": null,
+      "merged": true
+    }
+  ],
+  "commits": [
+    {
+      "sha": "000000000000000000000000000000000000000c",
+      "parents": ["000000000000000000000000000000000000000b", "0000000000000000000000000000000000000009"],
+      "subject": "Commit 12",
+      "author": "Developer",
+      "at": "2026-10-30T12:00:00Z",
+      "refs": ["main", "origin/main"]
+    },
+    {
+      "sha": "000000000000000000000000000000000000000b",
+      "parents": ["000000000000000000000000000000000000000a"],
+      "subject": "Commit 11",
+      "author": "Developer",
+      "at": "2026-10-29T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "000000000000000000000000000000000000000a",
+      "parents": ["0000000000000000000000000000000000000009"],
+      "subject": "Commit 10",
+      "author": "Developer",
+      "at": "2026-10-28T12:00:00Z",
+      "refs": ["aihub/session-fixture/feature"]
+    },
+    {
+      "sha": "0000000000000000000000000000000000000009",
+      "parents": ["0000000000000000000000000000000000000008"],
+      "subject": "Commit 9",
+      "author": "Developer",
+      "at": "2026-10-27T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000008",
+      "parents": ["0000000000000000000000000000000000000007"],
+      "subject": "Commit 8",
+      "author": "Developer",
+      "at": "2026-10-26T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000007",
+      "parents": ["0000000000000000000000000000000000000006"],
+      "subject": "Commit 7",
+      "author": "Developer",
+      "at": "2026-10-25T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000006",
+      "parents": ["0000000000000000000000000000000000000005"],
+      "subject": "Commit 6",
+      "author": "Developer",
+      "at": "2026-10-24T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000005",
+      "parents": ["0000000000000000000000000000000000000004"],
+      "subject": "Commit 5",
+      "author": "Developer",
+      "at": "2026-10-23T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000004",
+      "parents": ["0000000000000000000000000000000000000003"],
+      "subject": "Commit 4",
+      "author": "Developer",
+      "at": "2026-10-22T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000003",
+      "parents": ["0000000000000000000000000000000000000002"],
+      "subject": "Commit 3",
+      "author": "Developer",
+      "at": "2026-10-21T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000002",
+      "parents": ["0000000000000000000000000000000000000001"],
+      "subject": "Commit 2",
+      "author": "Developer",
+      "at": "2026-10-20T12:00:00Z",
+      "refs": []
+    },
+    {
+      "sha": "0000000000000000000000000000000000000001",
+      "parents": [],
+      "subject": "Commit 1",
+      "author": "Developer",
+      "at": "2026-10-19T12:00:00Z",
+      "refs": []
+    }
+  ]
+}

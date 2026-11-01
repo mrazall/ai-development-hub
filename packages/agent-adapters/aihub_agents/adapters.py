@@ -406,6 +406,17 @@ class CodexExecAdapter(_JsonLinesAdapter):
 CHAT_TOOLS = "Read Edit Write Bash Glob Grep WebFetch WebSearch"
 
 
+# Hub sessions run Claude non-interactively: nobody delivers a background task's notification, so agents fall
+# back to hand-made wait loops. `until ! ps aux | grep -q "turbo run"` matches its own command line and never
+# ends (seen twice on 30.10, the session hung for hours after the report was written).
+HEADLESS_RULES = (
+    "You run non-interactively inside AI Development Hub. Run builds and tests in the foreground with a timeout "
+    "(e.g. `timeout 900 pnpm test`), not in the background. Never wait for a process with a `ps | grep` or "
+    "`pgrep -f` loop: the loop's own command line matches the pattern and it never ends. If you must wait, wait "
+    "on a PID (`wait $pid`, `while kill -0 $pid`) or a file, and always bound the wait with `timeout`."
+)
+
+
 class ClaudeCodeAdapter(_JsonLinesAdapter):
     def __init__(
         self,
@@ -450,6 +461,8 @@ class ClaudeCodeAdapter(_JsonLinesAdapter):
             command += ["--mcp-config", str(mcp_config), "--strict-mcp-config"]
             if lean_tools:  # not for a workspace session that has the MCP server only to ask for permissions
                 command += ["--disable-slash-commands", "--tools", CHAT_TOOLS]
+        if not disable_tools:
+            append_system_prompt = "\n\n".join(filter(None, [HEADLESS_RULES, append_system_prompt]))
         if append_system_prompt:
             command += ["--append-system-prompt", append_system_prompt]
         if allowed_tools:

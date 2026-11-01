@@ -166,9 +166,13 @@ def runs_for_sessions(db, session_ids: list[str]) -> dict[str, list[RunInfo]]:
             def find(values, history=statuses):
                 return next((e.ts for e in history if e.payload.get('status') in values), None)
             last = statuses[-1]
+            # Sessions from before run records: the trigger is inferred from the order of the runs.
+            previous = result[session.id][-1] if result[session.id] else None
+            trigger = ('initial' if previous is None else 'retry_after_failure' if previous.status == 'failed'
+                       else 'continue')
             status = last.payload.get('status', 'unknown')
             status = 'running' if status in ('starting', 'running', 'waiting_approval', 'blocked') else status if status in ('queued', 'completed', 'failed', 'cancelled') else 'unknown'
-            result[session.id].append(RunInfo(None, session.id, i + 1, session.task_id, session.project_id, session.engine, None if changed else session.model, None if changed else session.account_profile_id, session.role, session.id if session.role == 'orchestrator' else session.parent_session_id if session.role == 'executor' else None, 'unknown', status, last.payload.get('reason') if status == 'failed' else None, find({'queued'}), find({'starting', 'running'}), find({'completed', 'failed', 'cancelled'}), _active(group), _waiting(group, 'approval'), _waiting(group, 'limit'), 'unknown' if changed else 'estimated', group[0].cursor, group[-1].cursor))
+            result[session.id].append(RunInfo(None, session.id, i + 1, session.task_id, session.project_id, session.engine, None if changed else session.model, None if changed else session.account_profile_id, session.role, session.id if session.role == 'orchestrator' else session.parent_session_id if session.role == 'executor' else None, trigger, status, last.payload.get('reason') if status == 'failed' else None, find({'queued'}), find({'starting', 'running'}), find({'completed', 'failed', 'cancelled'}), _active(group), _waiting(group, 'approval'), _waiting(group, 'limit'), 'unknown' if changed else 'estimated', group[0].cursor, group[-1].cursor))
     return result
 
 

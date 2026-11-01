@@ -31,6 +31,7 @@ export function Settings({ user }: { user: User }): JSX.Element {
           <Link to="/settings/mcp">MCP</Link>
           <Link to="/backups">{t('Резервные копии')}</Link>
           {user.role === 'admin' && <Link to="/settings/users">{t('Пользователи')}</Link>}
+          {user.role === 'admin' && <Link to="/settings/system">{t('Система')}</Link>}
         </section>
         <section className="panel">
           <h2>{t('Профиль')}</h2>

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from ..models import Notification, User
+from ..models import Notification, ProjectMember, User
 
 
 def notify(db, category: str, title: str, body: str = "", *, severity: str = "info", user_id: str | None = None, session_id: str | None = None):
@@ -15,3 +15,11 @@ def notify(db, category: str, title: str, body: str = "", *, severity: str = "in
 def notify_users(db, category: str, title: str, body: str = "", **kwargs):
     users = db.scalars(select(User)).all()
     return [notify(db, category, title, body, user_id=user.id, **kwargs) for user in users]
+
+
+def notify_project_users(db, project, category: str, title: str, body: str = "", **kwargs):
+    users = select(User)
+    if project.visibility not in ("shared", "public"):
+        members = select(ProjectMember.user_id).where(ProjectMember.project_id == project.id)
+        users = users.where((User.role == "admin") | User.id.in_(members))
+    return [notify(db, category, title, body, user_id=user.id, **kwargs) for user in db.scalars(users).all()]

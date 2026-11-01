@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Worker } from '../api/types';
 import { errorText, useApi } from '../api/useApi';
@@ -62,6 +63,14 @@ export function Workers({ user }: { user: User }): JSX.Element {
                       <strong>{worker.id}</strong>
                       <br />
                       <small className="muted">{worker.host}</small>
+                      {user.role === 'admin' && (
+                        <>
+                          <br />
+                          <Link to={`/settings/workers/${encodeURIComponent(worker.id)}/instructions`}>
+                            {t('Инструкции и навыки')}
+                          </Link>
+                        </>
+                      )}
                     </td>
                     <td>{worker.kind}</td>
                     <td>{worker.labels.join(', ') || '—'}</td>

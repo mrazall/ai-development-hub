@@ -23,6 +23,7 @@ from .routers import terminal
 from .routers import system
 from .routers import orchestration_view
 from .routers import stats
+from .routers import instructions
 from .orchestration.lifecycle import purge_expired
 from .orchestration.auto_resume import resume_due
 from .health import collect as collect_health, notify_changes
@@ -153,6 +154,7 @@ api.include_router(users.router)
 api.include_router(dashboard.router)
 api.include_router(accounts.router)  # accounts & model connections
 api.include_router(assignments.router)
+api.include_router(__import__("aihub_control.routers.repo", fromlist=["router"]).router)
 api.include_router(graph.router)
 api.include_router(notifications.router)
 api.include_router(mcp.router)  # MCP registry and config generation
@@ -164,6 +166,7 @@ api.include_router(limits.router)  # account limits
 api.include_router(limits.accounts_router)  # account limits worker endpoints
 api.include_router(orchestrations.router)  # orchestration API
 api.include_router(stats.router)  # token usage and API-equivalent cost
+api.include_router(instructions.router)  # AGENTS.md, CLAUDE.md, skills on workers
 api.include_router(terminal.router)  # embedded terminal relay (WebSocket)
 
 

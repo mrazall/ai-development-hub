@@ -312,10 +312,11 @@ def next_request(worker_id: str, principal=Depends(worker_principal), db=Depends
         "kind": request.kind,
         "path": request.path,
         "session_id": request.session_id,
-        "workdir": session.workdir if session else None,
+        "workdir": request.path if request.kind.startswith("repo_") else (session.workdir if session else None),
         # Account control requests also carry their validated account/engine parameters.
         "response": request.response if request.kind in {
-            "limits_refresh", "git_merge", "account_adopt_login", "account_delete"
+            "limits_refresh", "git_merge", "account_adopt_login", "account_delete", "instructions",
+            "repo_graph", "repo_commit", "repo_github", "repo_action"
         } else None,
     }
 
@@ -338,6 +339,11 @@ def request_response(
         from .orchestration_view import finish_merge
 
         finish_merge(db, request, payload)  # reads the merge parameters before they are replaced
+    if request.kind.startswith("repo_"):
+        from .repo import clean, finish_repo_request
+
+        payload = clean(payload)
+        finish_repo_request(db, request, payload)
     request.response = payload
     request.completed_at = datetime.now(timezone.utc)
     db.commit()

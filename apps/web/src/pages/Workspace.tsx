@@ -135,6 +135,7 @@ export function Workspace(): JSX.Element {
     setParams({ project: projectId, session: id });
     setMobileTab('chat');
   };
+  const accountName = useAccountName();
   const renderSession = (item: Session, group?: { count: number; open: boolean }, child = false) => (
     <div
       className={`session-list-item ${child ? 'session-list-child' : ''} ${selected?.id === item.id ? 'selected' : ''}`}
@@ -159,7 +160,9 @@ export function Workspace(): JSX.Element {
       <button type="button" className="session-list-open" onClick={() => openSession(item.id)}>
         <strong>{item.title || item.engine}</strong>
         <small>
-          {item.model} · <TimeAgo value={item.updated_at} />
+          {item.model}
+          {item.account_profile_id ? ` · ${accountName(item.account_profile_id)}` : ''} ·{' '}
+          <TimeAgo value={item.updated_at} />
           {(threads.chains.get(item.id)?.length ?? 1) > 1 &&
             t(' · продолжений: {0}', (threads.chains.get(item.id)?.length ?? 1) - 1)}
         </small>
@@ -218,6 +221,12 @@ export function Workspace(): JSX.Element {
       >
         <aside className="panel workspace-sidebar">
           <ProjectList projects={projectList} status={projectStatus} selected={projectId} onSelect={chooseProject} />
+          {projectId && (
+            <nav className="workspace-project-links" aria-label={t('Раздел проекта')}>
+              <Link to={`/projects/${projectId}/repo`}>{t('Репозиторий и GitHub')}</Link>
+              <Link to={`/projects/${projectId}/instructions`}>{t('Инструкции агентов')}</Link>
+            </nav>
+          )}
           <div className="sidebar-section">
             <div className="panel-heading">
               <h2>{t('Задачи')}</h2>
@@ -348,6 +357,7 @@ function SessionWorkspace({
     }
   };
   const attachments = useSessionAttachments(session.id);
+  const accountName = useAccountName();
   return (
     <section className="panel session-workspace">
       <div className="panel-heading">
@@ -356,6 +366,7 @@ function SessionWorkspace({
           <h2>{session.title || session.engine}</h2>
           <p className="muted">
             {session.project_id} · {session.worker_id} · {session.model}
+            {session.account_profile_id ? ` · ${t('аккаунт {0}', accountName(session.account_profile_id))}` : ''}
           </p>
           {attachments.length > 0 && (
             <p className="session-attachments">
@@ -635,6 +646,16 @@ function turnStart(events: SessionEvent[], status: string): string | undefined {
     .reverse()
     .find((event) => event.kind === 'session.status' && event.payload.status === status);
   return asked?.ts ?? reached?.ts;
+}
+
+/** The account's name for a session (its profile id when the list has not loaded or it was removed). */
+function useAccountName(): (id: string) => string {
+  const accounts = useApi<AccountProfile[]>('/accounts');
+  const names = useMemo(
+    () => new Map(arrayOrEmpty(accounts.data).map((account) => [account.id, account.name])),
+    [accounts.data],
+  );
+  return (id) => names.get(id) ?? id;
 }
 
 function eventIdentity(event: SessionEvent): string | null {
