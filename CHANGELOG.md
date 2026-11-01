@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0-alpha — repository and GitHub, agents' instructions, efficiency
+
+- Repository and GitHub tab per project: the commit graph with agents' branches, a commit's files, open pull
+  requests with checks and review state, CI runs with their jobs; merge or close a pull request and re-run failed
+  jobs after a confirmation. Data comes from the worker's own `gh` login and is cached by the hub; tokens are
+  scrubbed from every answer. Notifications about a project go only to its members.
+- Agents' instructions: edit `AGENTS.md`, `CLAUDE.md` and skills of a project or of a worker in the panel, with a
+  preview and the exact diff before saving. Project files are committed one at a time, worker files keep their
+  last 20 versions; a file changed on the worker in the meantime is never overwritten. File contents are not
+  stored or logged by the hub.
+- Statistics → Efficiency: cost, tokens and time per task, the orchestrator's share, why each run started, and
+  observations about tasks that cost more than usual or kept retrying. The page loads in about a second.
+- Sessions show the account next to the model; long tool sequences in chats and sessions fold into one step with
+  the model's own description.
+- Workers: Claude agents get a rule against wait loops that match their own command line (they hung for
+  hours); GitHub data is collected in parallel (about 24 s → 6 s on a real repository); a limit message such as
+  "you've hit your 5-hour limit" is recognised for auto-resume; Codex gets network access and the git
+  directory of its worktree inside its sandbox.
+
 ## 0.2.0-alpha — Windows app, accounts, staying signed in
 
 - Windows desktop app (Tauri 2): a setup wizard for WSL and the worker, adoption of a worker installed by

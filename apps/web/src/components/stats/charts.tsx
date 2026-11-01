@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { t } from '../../i18n';
+import { lang, t } from '../../i18n';
 
 // Shared pieces of the statistics page: number formats and the stacked daily chart with its legend.
 export const tokens = (value: number) =>
@@ -12,7 +12,7 @@ export const tokens = (value: number) =>
         : String(value);
 export const money = (value: number) => `$${value >= 100 ? value.toFixed(0) : value.toFixed(2)}`;
 export const dayLabel = (iso: string) =>
-  new Date(`${iso}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  new Date(`${iso}T00:00:00`).toLocaleDateString(lang, { day: 'numeric', month: 'short' });
 
 export function days(from: string, to: string): string[] {
   const out: string[] = [];

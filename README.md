@@ -19,11 +19,16 @@
 </p>
 
 <p align="center">
-  <b>New in 0.2.0-alpha:</b> a Windows desktop app, any number of Claude/Codex accounts with hand-over between
-  them, and a sign-in that stays. <a href="https://github.com/mrazall/ai-development-hub/releases/tag/v0.2.0-alpha">Release notes</a>
+  <b>New in 0.3.0-alpha:</b> your repository and GitHub inside the panel, agents' instructions and skills you edit
+  in the browser, and a statistics page that shows what each task really cost.
+  <a href="https://github.com/mrazall/ai-development-hub/releases/tag/v0.3.0-alpha">Release notes</a>
 </p>
 
 ![The demo: a session, a chat with memory and the knowledge graph (mock engines)](docs/assets/demo.gif)
+
+| Repository and GitHub | Agents' instructions | Efficiency |
+| --- | --- | --- |
+| ![Commit graph, pull requests and CI runs](docs/assets/repo.png) | ![Editing AGENTS.md with the diff before saving](docs/assets/instructions.png) | ![Cost and time per task](docs/assets/efficiency.png) |
 
 <sub>Recorded in the built-in demo mode: the agents are mock engines that echo the task, so it runs without any
 subscription. Real sessions look the same with Claude Code or Codex output.</sub>
@@ -76,6 +81,23 @@ into one folder; you review a draft, and one click lets a model merge it into th
 
 **Chat with your notes.** Personal Claude chats that can search the vault; choose the account, model and effort
 per message.
+
+**See the repository and GitHub next to the agents.** Each project has a *Repository and GitHub* tab: the commit
+graph with the branches agents work on, a commit's files, open pull requests with their checks and review state,
+and recent CI runs with their jobs. Merge or close a pull request, or re-run the failed jobs, after a
+confirmation. The worker asks GitHub through your own `gh` login on that machine; the hub only caches the answer
+and keeps tokens out of it.
+
+**Edit what agents read before they start.** `AGENTS.md`, `CLAUDE.md` and skills (`.claude/skills/<name>/SKILL.md`)
+of a project, and the worker-wide ones, open in the panel with a preview. Before saving you see exactly which
+lines change; a project file is committed alone (your own uncommitted edits get their own commit first), a
+worker file keeps its last 20 versions to restore. If the file changed on the worker meanwhile, nothing is
+overwritten. For a worker-wide file the panel names the accounts it applies to.
+
+**Know what a task cost.** *Statistics → Efficiency* breaks work down by task: tokens, API-equivalent cost, time,
+how much went to the orchestrator and how much to executors, why each run started (first run, continuation,
+retry after an error, rework) and plain-language observations, such as a task that cost far more than usual or
+kept retrying.
 
 **Know when something breaks.** A System health page checks workers, Tailscale, account limits, the index,
 backups and recent failures, and sends a notification when a check fails or recovers. A failed session you have

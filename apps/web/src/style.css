@@ -5585,3 +5585,7 @@ i.stats-series-4 {
   margin: 4px 0 14px;
   font-size: 0.9rem;
 }
+
+.efficiency-tasks th {
+  white-space: nowrap;
+}
