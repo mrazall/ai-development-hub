@@ -1,9 +1,10 @@
 name: CI
-# Every push and pull request: lint, all Python test suites against real Postgres and Qdrant (including the
+# Every main push and pull request: lint, all Python test suites against real Postgres and Qdrant (including the
 # user-scenario tests with a live mock worker), the web panel, compose files and a secrets scan.
 # No paid models are called: agents in tests are the built-in mock engines.
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
