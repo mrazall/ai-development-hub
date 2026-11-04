@@ -8,6 +8,7 @@ import pytest
 
 from aihub_agents.adapters import (
     HEADLESS_RULES,
+    SHARE_RULE,
     ClaudeCodeAdapter,
     CodexExecAdapter,
     MockAdapter,
@@ -64,7 +65,7 @@ def test_codex_command_is_workspace_scoped_and_contains_prompt(tmp_path):
     assert adapter.command == [
         "codex", "exec", "--json", "--cd", str(tmp_path), "--sandbox", "workspace-write",
         "--skip-git-repo-check", "-m", "gpt-test", "-c", "sandbox_workspace_write.network_access=true",
-        "--", "Fix the tests",
+        "-c", f"developer_instructions={json.dumps(SHARE_RULE)}", "--", "Fix the tests",
     ]
     assert adapter.workdir == str(tmp_path)
     assert "danger-full-access" not in adapter.command
@@ -75,7 +76,7 @@ def test_claude_command_is_workspace_scoped_and_uses_accept_edits(tmp_path):
     assert adapter.command == [
             "claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
         "--permission-mode", "acceptEdits", "--effort", "low", "--model", "sonnet",
-        "--append-system-prompt", HEADLESS_RULES, "--", "Update README",
+        "--append-system-prompt", f"{HEADLESS_RULES}\n\n{SHARE_RULE}", "--", "Update README",
     ]
     assert adapter.workdir == str(tmp_path)
     assert "--dangerously-skip-permissions" not in adapter.command
@@ -94,7 +95,7 @@ def test_claude_chat_command_uses_session_mcp_without_token_in_argv(tmp_path):
     assert "scoped-secret" not in adapter.command
     assert adapter.extra_env["AIHUB_HUB_TOKEN"] == "scoped-secret"
     # The session's own prompt comes after the worker's rule against self-matching wait loops.
-    assert adapter.command[adapter.command.index("--append-system-prompt") + 1] == f"{HEADLESS_RULES}\n\nsearch memory first"
+    assert adapter.command[adapter.command.index("--append-system-prompt") + 1] == f"{HEADLESS_RULES}\n\n{SHARE_RULE}\n\nsearch memory first"
 
 
 def test_prompts_are_never_parsed_as_flags():
@@ -185,7 +186,7 @@ def test_claude_resume_is_before_prompt_separator(tmp_path):
     assert adapter.command == [
             "claude", "-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
         "--permission-mode", "acceptEdits", "--effort", "low", "--model", "sonnet", "--resume", "claude-123",
-        "--append-system-prompt", HEADLESS_RULES, "--", "--looks-like-a-flag",
+        "--append-system-prompt", f"{HEADLESS_RULES}\n\n{SHARE_RULE}", "--", "--looks-like-a-flag",
     ]
 
 
@@ -449,3 +450,17 @@ def test_codex_executors_get_network_and_the_shared_git(tmp_path):
     settings = [command[i + 1] for i, part in enumerate(command) if part == "-c"]
     assert "sandbox_workspace_write.network_access=true" in settings
     assert f'sandbox_workspace_write.writable_roots=["{(repo / ".git").resolve()}"]' in settings
+
+
+def test_codex_orchestrator_gets_instructions_and_a_tokenless_mcp_server(tmp_path):
+    import tomllib
+
+    from aihub_agents.mcp_config import codex_session_toml
+
+    adapter = CodexExecAdapter("/profile", tmp_path, "gpt", "plan", developer_instructions='Ты — оркестратор "A"')
+    value = next(item for item in adapter.command if item.startswith("developer_instructions="))
+    assert tomllib.loads(value)["developer_instructions"] == f'{SHARE_RULE}\n\nТы — оркестратор "A"'
+    config = tomllib.loads(codex_session_toml("http://hub", tmp_path / "token", orchestrator_session="s1", command="mcp"))
+    server = config["mcp_servers"]["knowledge"]
+    assert server["env"]["AIHUB_ORCH_SESSION"] == "s1" and server["env"]["AIHUB_HUB_TOKEN_FILE"] == str(tmp_path / "token")
+    assert "AIHUB_HUB_TOKEN" not in server["env"] and server["tool_timeout_sec"] >= 3600

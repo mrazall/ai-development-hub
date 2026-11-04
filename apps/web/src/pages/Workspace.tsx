@@ -34,6 +34,7 @@ import {
 import { Icon } from '../components/ui/icons';
 import { ChatComposer } from '../components/ChatComposer';
 import { SessionTerminal } from '../components/Terminal';
+import { FolderBrowser } from '../components/FolderBrowser';
 import { MarkdownView } from '../components/MarkdownView';
 import { CopyButton, QuoteSelection } from '../components/copy';
 import { AttachmentChips, useSessionAttachments } from '../components/attachments';
@@ -224,6 +225,7 @@ export function Workspace(): JSX.Element {
           {projectId && (
             <nav className="workspace-project-links" aria-label={t('Раздел проекта')}>
               <Link to={`/projects/${projectId}/repo`}>{t('Репозиторий и GitHub')}</Link>
+              <Link to={`/projects/${projectId}/files`}>{t('Файлы проекта')}</Link>
               <Link to={`/projects/${projectId}/instructions`}>{t('Инструкции агентов')}</Link>
             </nav>
           )}
@@ -481,6 +483,14 @@ function SessionWorkspace({
           extraTabs={[
             { id: 'chat', label: t('Чат'), content: <ChatFeed sessionId={session.id} status={session.status} /> },
             { id: 'events', label: t('События'), content: <SessionEvents sessionId={session.id} /> },
+            // The session's own folder (an executor's worktree): the screenshots it links to, .aihub/share first.
+            {
+              id: 'files',
+              label: t('Файлы'),
+              content: (
+                <FolderBrowser base={`/sessions/${encodeURIComponent(session.id)}`} rootLabel={t('Папка сессии')} />
+              ),
+            },
             // Orchestration links: the executors an orchestrator runs, or the parent of an executor.
             ...(session.role
               ? [
@@ -1033,7 +1043,10 @@ function NewSessionDialog({
   // Only accounts signed in on the chosen worker: a login lives in a profile folder on that machine.
   const workerAccounts = accountList.filter((item) => item.worker_id === form.worker_id && item.status === 'connected');
   const account = workerAccounts.find((item) => item.id === form.account_profile_id);
-  const orchestratorAccounts = workerAccounts.filter((item) => item.kind === 'claude_code_subscription');
+  // The orchestrator may be Claude Code or Codex (GPT); executors are always Codex.
+  const orchestratorAccounts = workerAccounts.filter(
+    (item) => item.kind === 'claude_code_subscription' || item.kind === 'codex_subscription',
+  );
   const executorAccounts = workerAccounts.filter((item) => item.kind === 'codex_subscription');
   const selectedProject = projects.find((item) => item.id === form.project_id);
   const models = account?.models ?? [];
@@ -1046,7 +1059,8 @@ function NewSessionDialog({
   // Models of the engine that runs: Codex reports its own list (with effort levels) through the worker;
   // Claude Code has a fixed family. A profile's own models and default are offered too.
   const codexModels = selectedWorker.data?.models?.codex ?? [];
-  const modelEngine = form.mode === 'orchestrated' ? 'claude_code' : form.engine;
+  const modelEngine =
+    form.mode === 'orchestrated' ? (account?.kind === 'codex_subscription' ? 'codex' : 'claude_code') : form.engine;
   const modelChoices: WorkerModel[] = (() => {
     const known: WorkerModel[] =
       modelEngine === 'codex'
@@ -1262,7 +1276,7 @@ function NewSessionDialog({
         </label>
         {!accountNotFound && (
           <label>
-            {form.mode === 'orchestrated' ? t('Оркестратор (Claude)') : t('Аккаунт')}
+            {form.mode === 'orchestrated' ? t('Оркестратор (Claude или GPT)') : t('Аккаунт')}
             <select
               value={form.account_profile_id}
               onChange={(event) => update('account_profile_id', event.target.value)}

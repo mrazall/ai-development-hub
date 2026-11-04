@@ -73,7 +73,8 @@ def test_reused_executor_creates_rework_run(client, admin_token):
     assert first.status_code == 201, first.text
     _, factory = get_session_factory()
     with factory() as db:
-        db.get(Session, first.json()["id"]).status = "completed"
+        done = db.get(Session, first.json()["id"])
+        done.status, done.engine_session_ref = "completed", "codex-thread-1"
         db.commit()
     second = client.post(url, headers=auth(token), json={"title": "Fix", "prompt": "rework", "reuse_branch_of": first.json()["id"]})
     assert second.status_code == 201, second.text
@@ -82,6 +83,13 @@ def test_reused_executor_creates_rework_run(client, admin_token):
         runs = _runs(db, second.json()["id"])
         assert len(runs) == 1 and runs[0].trigger == "rework"
         assert runs[0].orchestration_id == sid
+        # The rework continues the executor's conversation: no second read of the whole repository.
+        assert db.get(Session, second.json()["id"]).engine_session_ref == "codex-thread-1"
+        db.get(Session, second.json()["id"]).status = "failed"
+        db.commit()
+    third = client.post(url, headers=auth(token), json={"title": "Again", "prompt": "retry", "reuse_branch_of": second.json()["id"]})
+    with factory() as db:
+        assert db.get(Session, third.json()["id"]).engine_session_ref is None  # after a failure: a clean start
 
 
 def test_wait_intervals_are_measured_only_when_closed(client, admin_token):

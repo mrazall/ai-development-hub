@@ -1,12 +1,14 @@
 import { lazy, Suspense, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ErrorBoundary, reloadOnceForStaleBundle, reportClientError } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { useSession } from './auth/session';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Repo } from './pages/project/Repo';
+import { ProjectFiles } from './pages/project/Files';
 import { Projects } from './pages/Projects';
 import { SessionDetail } from './pages/SessionDetail';
 import { Sessions } from './pages/Sessions';
@@ -64,6 +66,7 @@ function PrivateRoutes(): JSX.Element {
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="projects/:id/instructions" element={<ProjectInstructions />} />
           <Route path="projects/:id/repo" element={<Repo />} />
+          <Route path="projects/:id/files" element={<ProjectFiles />} />
           <Route path="tasks" element={<Tasks user={user} />} />
           <Route path="workers" element={<Workers user={user} />} />
           <Route path="sessions" element={<Sessions />} />
@@ -109,11 +112,20 @@ function App(): JSX.Element {
     </Routes>
   );
 }
+// Vite reports a bundle file that failed to load (an old page after a deploy): reload once for the new one.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadOnceForStaleBundle((event as Event & { payload?: unknown }).payload)) event.preventDefault();
+});
+window.addEventListener('unhandledrejection', (event) => {
+  if (!reloadOnceForStaleBundle(event.reason)) reportClientError(event.reason, 'promise');
+});
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary where="app">
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );
 

@@ -115,15 +115,17 @@ function human(value: string | null): string {
   };
   return (value && labels[value]) || t('Неизвестно');
 }
-export function ProjectTabs({ id, repo }: { id: string; repo: boolean }): JSX.Element {
+export function ProjectTabs({ id, active }: { id: string; active: 'overview' | 'repo' | 'files' }): JSX.Element {
+  const tab = (value: typeof active, to: string, label: string) => (
+    <Link className={active === value ? 'active' : ''} to={to}>
+      {label}
+    </Link>
+  );
   return (
     <nav className="stats-periods repo-tabs" aria-label={t('Раздел проекта')}>
-      <Link className={!repo ? 'active' : ''} to={`/projects/${id}`}>
-        {t('Обзор')}
-      </Link>
-      <Link className={repo ? 'active' : ''} to={`/projects/${id}/repo`}>
-        {t('Репозиторий и GitHub')}
-      </Link>
+      {tab('overview', `/projects/${id}`, t('Обзор'))}
+      {tab('repo', `/projects/${id}/repo`, t('Репозиторий и GitHub'))}
+      {tab('files', `/projects/${id}/files`, t('Файлы'))}
     </nav>
   );
 }
@@ -293,7 +295,7 @@ export function Repo(): JSX.Element {
           </Link>
           <p className="eyebrow">{t('ПРОЕКТ')}</p>
           <h1>{project.data?.name || t('Репозиторий')}</h1>
-          <ProjectTabs id={id} repo />
+          <ProjectTabs id={id} active="repo" />
         </div>
       </div>
       {error && <ErrorBanner message={error} />}

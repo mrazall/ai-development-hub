@@ -60,7 +60,7 @@ export function ProjectDetail(): JSX.Element {
           />
         </div>
       </div>
-      <ProjectTabs id={project.id} repo={false} />
+      <ProjectTabs id={project.id} active="overview" />
       <div className="detail-grid">
         <section className="panel">
           <h2>{t('Настройки')}</h2>

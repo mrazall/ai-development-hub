@@ -315,7 +315,7 @@ def next_request(worker_id: str, principal=Depends(worker_principal), db=Depends
         "workdir": request.path if request.kind.startswith("repo_") else (session.workdir if session else None),
         # Account control requests also carry their validated account/engine parameters.
         "response": request.response if request.kind in {
-            "limits_refresh", "git_merge", "account_adopt_login", "account_delete", "instructions",
+            "limits_refresh", "git_merge", "account_adopt_login", "account_delete", "instructions", "files",
             "repo_graph", "repo_commit", "repo_github", "repo_action"
         } else None,
     }

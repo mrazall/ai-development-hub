@@ -70,6 +70,26 @@ def write_claude_session_config(
     return target
 
 
+def codex_session_toml(hub_url: str, token_file: str | os.PathLike[str], *, orchestrator_session: str | None = None,
+                       command: str | None = None) -> str:
+    """The hub MCP server for a Codex orchestrator: `[mcp_servers.knowledge]` for its config.toml overlay.
+
+    Like the Claude config, the token is never in argv: the server reads it from a 0600 file the worker renews.
+    """
+    venv_binary = Path(sys.executable).parent / "aihub-knowledge-mcp"
+    server_command = command or (str(venv_binary) if venv_binary.is_file() else shutil.which("aihub-knowledge-mcp"))
+    if not server_command:
+        raise FileNotFoundError("aihub-knowledge-mcp is not installed in the worker environment")
+    env = {"AIHUB_HUB_URL": hub_url, "AIHUB_HUB_TOKEN_FILE": str(token_file), "AIHUB_MCP_TOOLSET": "lean"}
+    if orchestrator_session:
+        env["AIHUB_ORCH_SESSION"] = orchestrator_session
+    lines = ["[mcp_servers.knowledge]", f"command = {json.dumps(server_command)}", "args = []",
+             # orch_wait blocks until an executor finishes: far longer than Codex's default tool timeout.
+             "tool_timeout_sec = 3600", "", "[mcp_servers.knowledge.env]"]
+    lines += [f"{key} = {json.dumps(value)}" for key, value in env.items()]
+    return "\n".join(lines) + "\n"
+
+
 def fetch_config(
     control_plane_url: str,
     project_id: str,
@@ -122,4 +142,4 @@ def write_session_config(
     return target
 
 
-__all__ = ["fetch_config", "write_session_config"]
+__all__ = ["codex_session_toml", "fetch_config", "write_session_config"]

@@ -23,7 +23,7 @@ from .routers import terminal
 from .routers import system
 from .routers import orchestration_view
 from .routers import stats
-from .routers import instructions
+from .routers import client_errors, files, instructions
 from .orchestration.lifecycle import purge_expired
 from .orchestration.auto_resume import resume_due
 from .health import collect as collect_health, notify_changes
@@ -167,6 +167,8 @@ api.include_router(limits.accounts_router)  # account limits worker endpoints
 api.include_router(orchestrations.router)  # orchestration API
 api.include_router(stats.router)  # token usage and API-equivalent cost
 api.include_router(instructions.router)  # AGENTS.md, CLAUDE.md, skills on workers
+api.include_router(files.router)  # browsing a session's working folder
+api.include_router(client_errors.router)  # a page that crashed in a browser, into the hub log
 api.include_router(terminal.router)  # embedded terminal relay (WebSocket)
 
 

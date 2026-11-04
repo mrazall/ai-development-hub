@@ -90,8 +90,20 @@ def test_orchestrator_token_is_confined_to_its_own_orchestration(client, admin_t
 
 def test_orchestration_rejects_wrong_account_kinds(client, admin_token):  # noqa: F811
     _setup(client, admin_token)
-    assert _create(client, admin_token, orchestrator="codex-x").status_code == 409
     assert _create(client, admin_token, executor="claude-o").status_code == 409
+
+
+def test_a_codex_account_can_orchestrate(client, admin_token):  # noqa: F811
+    _setup(client, admin_token)
+    response = _create(client, admin_token, orchestrator="codex-x")
+    assert response.status_code == 201, response.text
+    _, factory = get_session_factory()
+    with factory() as db:
+        session = db.get(Session, response.json()["session_id"])
+        assert (session.engine, session.provider, session.role) == ("codex", "openai", "orchestrator")
+        prompt = session.mcp_config["append_system_prompt"]
+        # Codex names the tools by server: no Claude-style mcp__knowledge__ prefix, no Claude background tools.
+        assert "orch_spawn_executor" in prompt and "mcp__knowledge__" not in prompt and "Monitor" not in prompt
 
 
 def test_delete_session_removes_finished_orchestration_with_executors(client, admin_token):  # noqa: F811

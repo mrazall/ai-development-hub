@@ -367,6 +367,14 @@ def extract_claude_metadata(records: list[dict[str, Any]]) -> tuple[str | None, 
     return session_id, context_tokens
 
 
+# The panel's Files tab opens a session's working folder with this folder first.
+SHARE_RULE = (
+    "Files meant for the owner — screenshots, rendered pages, reports — go into `.aihub/share/` in the working "
+    "folder (create it); the owner opens them in the panel's Files tab. Mention each file's path in your answer. "
+    "Never commit `.aihub/`."
+)
+
+
 class CodexExecAdapter(_JsonLinesAdapter):
     def __init__(
         self,
@@ -377,6 +385,7 @@ class CodexExecAdapter(_JsonLinesAdapter):
         resume: str | None = None,
         effort: str | None = None,
         writable_roots: list[str] | None = None,
+        developer_instructions: str | None = None,
     ):
         if resume:
             # `exec resume` has no --cd/--sandbox: the process cwd is the workdir, the sandbox goes via -c.
@@ -396,6 +405,9 @@ class CodexExecAdapter(_JsonLinesAdapter):
         command += ["-c", "sandbox_workspace_write.network_access=true"]
         if writable_roots:
             command += ["-c", "sandbox_workspace_write.writable_roots=[" + ",".join(f'"{root}"' for root in writable_roots) + "]"]
+        # Codex's counterpart of Claude's --append-system-prompt (a TOML string).
+        developer_instructions = "\n\n".join(filter(None, [SHARE_RULE, developer_instructions]))
+        command += ["-c", f"developer_instructions={json.dumps(developer_instructions)}"]
         if resume:
             command += [resume]
         if prompt:
@@ -462,7 +474,7 @@ class ClaudeCodeAdapter(_JsonLinesAdapter):
             if lean_tools:  # not for a workspace session that has the MCP server only to ask for permissions
                 command += ["--disable-slash-commands", "--tools", CHAT_TOOLS]
         if not disable_tools:
-            append_system_prompt = "\n\n".join(filter(None, [HEADLESS_RULES, append_system_prompt]))
+            append_system_prompt = "\n\n".join(filter(None, [HEADLESS_RULES, SHARE_RULE, append_system_prompt]))
         if append_system_prompt:
             command += ["--append-system-prompt", append_system_prompt]
         if allowed_tools:

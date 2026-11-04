@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- GPT can orchestrate: pick a Codex account as the orchestrator; it gets the orchestration tools through its own
+  MCP config (the hub token stays in a file) and its rules as developer instructions.
+- Files: browse a project's folder or one session's folder (an executor's worktree) in the panel — images, text
+  and Markdown preview, download, and a box to open a path straight from an agent's message. Agents put files
+  meant for you (screenshots, reports) into `.aihub/share/`, which opens first.
+- Rework of an executor on the same branch continues its Codex conversation instead of re-reading the repository.
+- No more empty grey screen: a page that throws shows the error with a way out, an old page after a deploy
+  reloads once for the new bundle, and browser errors go to the hub log.
+
 ## 0.3.0-alpha — repository and GitHub, agents' instructions, efficiency
 
 - Repository and GitHub tab per project: the commit graph with agents' branches, a commit's files, open pull

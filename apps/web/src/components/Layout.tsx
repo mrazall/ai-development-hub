@@ -4,6 +4,7 @@ import { arrayOrEmpty, useApi } from '../api/useApi';
 import { useEventStream } from '../api/events';
 import type { Approval, Notification } from '../api/types';
 import { logout } from '../auth/session';
+import { ErrorBoundary } from './ErrorBoundary';
 import { LogoMark } from './Logo';
 import type { User } from '../auth/session';
 import { NavBar } from './NavBar';
@@ -116,7 +117,10 @@ export function Layout({ user }: { user: User }): JSX.Element {
             )}
           </div>
         )}
-        <Outlet />
+        {/* A new page starts with a fresh boundary: a broken page does not break the next one. */}
+        <ErrorBoundary key={location.pathname} where="page">
+          <Outlet />
+        </ErrorBoundary>
       </main>
       {palette && (
         <div className="command-palette-backdrop" role="presentation" onMouseDown={() => setPalette(false)}>

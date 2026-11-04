@@ -29,10 +29,11 @@ from .adapters import (
     MockAdapter,
     ensure_allowed_workdir,
 )
-from .mcp_config import write_claude_session_config, write_session_config
+from .mcp_config import codex_session_toml, write_claude_session_config, write_session_config
 from .repo import clean_error, repo_action, repo_commit, repo_github, repo_graph
 from .rate_limits import latest_codex_rollout_rate_limits
 from .usage_probe import probe_limits
+from .files import handle as handle_files
 from .instructions import handle as handle_instructions
 from .workspace import (
     commit_worktree,
@@ -327,6 +328,12 @@ class Worker:
                 )
             elif request.get("kind") == "instructions":
                 result = await asyncio.to_thread(handle_instructions, request.get("response") or {})
+            elif request.get("kind") == "files":
+                # The folder comes from the hub's records: a session's workdir, or a project's root that the hub
+                # put into the parameters itself (the panel's request carries only op and path).
+                params = request.get("response") or {}
+                params = {**params, "workdir": request.get("workdir") or params.get("workdir")}
+                result = await asyncio.to_thread(handle_files, params)
             elif request.get("kind") == "mkdir":
                 result = await asyncio.to_thread(make_project_dir, request.get("path") or "", self.workspace_roots)
             else:
@@ -507,18 +514,25 @@ class Worker:
                     # profile (auth, history) and only replaces config.toml.
                     codex_home_for_limits = _codex_base_home(config_dir)
                     codex_overlay = Path(tempfile.mkdtemp(prefix="aihub-codex-"))
-                    scratch = codex_overlay / ".mcp"
-                    mcp_file = await asyncio.to_thread(
-                        write_session_config,
-                        workdir,
-                        self.base,
-                        session.get("project_id", ""),
-                        engine,
-                        self.token,
-                        codex_home=scratch,
-                    )
-                    mcp_toml = mcp_file.read_text(encoding="utf-8")
-                    shutil.rmtree(scratch, ignore_errors=True)
+                    if session.get("role") == "orchestrator" and session.get("knowledge_token"):
+                        # A Codex orchestrator: the hub server with the orch_* tools and a renewed scoped token.
+                        session_mcp_dir = Path(tempfile.mkdtemp(prefix="aihub-mcp-"))
+                        session_token_file = session_mcp_dir / "hub-token"
+                        await asyncio.to_thread(write_token_file, session_token_file, str(session["knowledge_token"]))
+                        mcp_toml = codex_session_toml(self.base, session_token_file, orchestrator_session=session["id"])
+                    else:
+                        scratch = codex_overlay / ".mcp"
+                        mcp_file = await asyncio.to_thread(
+                            write_session_config,
+                            workdir,
+                            self.base,
+                            session.get("project_id", ""),
+                            engine,
+                            self.token,
+                            codex_home=scratch,
+                        )
+                        mcp_toml = mcp_file.read_text(encoding="utf-8")
+                        shutil.rmtree(scratch, ignore_errors=True)
                     if "[mcp_servers" not in mcp_toml:
                         shutil.rmtree(codex_overlay, ignore_errors=True)
                         codex_overlay = None
@@ -586,7 +600,8 @@ class Worker:
             else (
                 CodexExecAdapter(config_dir, workdir, session.get("model"), prompt, resume=continuation_ref,
                                  writable_roots=git_common_dirs(workdir),
-                                 effort=(session.get("mcp_config") or {}).get("effort"))
+                                 effort=(session.get("mcp_config") or {}).get("effort"),
+                                 developer_instructions=(session.get("mcp_config") or {}).get("append_system_prompt"))
                 if session.get("engine") == "codex"
                 else ClaudeCodeAdapter(
                     config_dir, workdir, session.get("model"), prompt,

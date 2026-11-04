@@ -21,10 +21,11 @@ router = APIRouter(prefix="/orchestrations", tags=["orchestrations"])
 bearer = HTTPBearer(auto_error=False)
 
 
-def _profile(db, profile_id: str, kind: str) -> tuple[AccountProfile, Worker]:
+def _profile(db, profile_id: str, kind: str | tuple[str, ...]) -> tuple[AccountProfile, Worker]:
+    kinds = (kind,) if isinstance(kind, str) else kind
     profile = db.get(AccountProfile, profile_id)
-    if not profile or profile.kind != kind:
-        raise HTTPException(409, f"account profile must be {kind}")
+    if not profile or profile.kind not in kinds:
+        raise HTTPException(409, f"account profile must be {' or '.join(kinds)}")
     worker = db.get(Worker, profile.worker_id)
     if not worker or worker.status != "online":
         raise HTTPException(409, f"{kind} account worker is offline")
@@ -65,7 +66,19 @@ MANUAL_MERGE_RULE = (
 )
 
 
-def _orchestrator_prompt(count: int, manual_merge: bool = False) -> str:
+def _orchestrator_prompt(count: int, manual_merge: bool = False, engine: str = "claude_code") -> str:
+    text = _claude_orchestrator_prompt(count, manual_merge)
+    if engine != "codex":
+        return text
+    # Codex names MCP tools by server and tool and has no Claude background tools.
+    return (text.replace("Инструменты оркестрации называются полностью, с префиксом mcp__knowledge__. ",
+                         "Инструменты оркестрации — у MCP-сервера knowledge (orch_*). ")
+            .replace("mcp__knowledge__", "")
+            .replace("Никогда не жди фоновыми командами (run_in_background, Monitor)", "Никогда не жди фоновыми командами")
+            .replace("в обычной команде Bash", "в обычной команде shell"))
+
+
+def _claude_orchestrator_prompt(count: int, manual_merge: bool = False) -> str:
     merge = (
         MANUAL_MERGE_RULE if manual_merge
         else "Готовые ветки сливай в базовую ветку сам (git merge), запускай тесты проекта. "
@@ -111,7 +124,12 @@ def _executor_payload(db, session: Session) -> dict:
 @router.post("", status_code=201)
 def create_orchestration(data: OrchestrationCreateIn, user=Depends(write_user), db=Depends(db_dep)):
     project = project_or_404(db, user, data.project_id)
-    orchestrator, orch_worker = _profile(db, data.orchestrator.account_profile_id, "claude_code_subscription")
+    orchestrator, orch_worker = _profile(db, data.orchestrator.account_profile_id,
+                                         ("claude_code_subscription", "codex_subscription"))
+    # The orchestrator may be Claude Code or Codex (GPT); executors are Codex.
+    orch_engine = "codex" if orchestrator.kind == "codex_subscription" else "claude_code"
+    orch_model = data.orchestrator.model or orchestrator.default_model or (
+        "gpt-5.6-luna" if orch_engine == "codex" else "claude-opus-5-5")
     executor, executor_worker = _profile(db, data.executors.account_profile_id, "codex_subscription")
     base_workdir = data.workdir or (project.allowed_paths[0] if project.allowed_paths else ".")
     if data.workdir and not any(
@@ -123,8 +141,8 @@ def create_orchestration(data: OrchestrationCreateIn, user=Depends(write_user), 
     db.add(task)
     db.flush()
     session = Session(
-        task_id=task.id, project_id=project.id, worker_id=orch_worker.id, engine="claude_code",
-        provider="claude", model=data.orchestrator.model or orchestrator.default_model or "claude-opus-5-5",
+        task_id=task.id, project_id=project.id, worker_id=orch_worker.id, engine=orch_engine,
+        provider="openai" if orch_engine == "codex" else "claude", model=orch_model,
         auth_mode="subscription", workdir=base_workdir,
         branch=base_branch, title=data.title, role="orchestrator", status="draft" if data.hold else "queued",
         account_profile_id=orchestrator.id,
@@ -132,7 +150,7 @@ def create_orchestration(data: OrchestrationCreateIn, user=Depends(write_user), 
             "max_executors": data.executors.count,
             "orchestrator_account_profile_id": orchestrator.id,
             "orchestrator_worker_id": orch_worker.id,
-            "orchestrator_model": data.orchestrator.model or orchestrator.default_model or "claude-opus-5-5",
+            "orchestrator_model": orch_model,
             "executor_account_profile_id": executor.id,
             "executor_model": data.executors.model or executor.default_model or "gpt-5.6-luna",
             "executor_worker_id": executor_worker.id,
@@ -141,7 +159,7 @@ def create_orchestration(data: OrchestrationCreateIn, user=Depends(write_user), 
             "manual_merge": data.manual_merge,
             "plan": [],
         },
-        mcp_config={"user_id": user.id, "mcpServers": {"knowledge": {"command": "aihub-knowledge-mcp", "args": []}, "orchestration": {"command": "aihub-knowledge-mcp", "args": []}}, "AIHUB_ORCH_SESSION": "pending", "append_system_prompt": _orchestrator_prompt(data.executors.count, data.manual_merge)},
+        mcp_config={"user_id": user.id, "mcpServers": {"knowledge": {"command": "aihub-knowledge-mcp", "args": []}, "orchestration": {"command": "aihub-knowledge-mcp", "args": []}}, "AIHUB_ORCH_SESSION": "pending", "append_system_prompt": _orchestrator_prompt(data.executors.count, data.manual_merge, orch_engine)},
     )
     db.add(session)
     db.flush()
@@ -174,6 +192,12 @@ def spawn(orchestrator_id: str, data: ExecutorCreateIn, user=Depends(_scope), db
     db.flush()
     from ..analytics.runs import create_run, latest_run
     previous = latest_run(db, source.id) if data.reuse_branch_of else None
+    # Rework on the same branch continues the executor's own Codex conversation instead of a fresh one that
+    # re-reads the whole repository (fresh executors were two thirds of all cached tokens). The thread lives in
+    # the account's profile on that worker, and a failed run starts clean.
+    if (data.reuse_branch_of and source.engine_session_ref and source.status == "completed"
+            and source.worker_id == child.worker_id and source.account_profile_id == child.account_profile_id):
+        child.engine_session_ref = source.engine_session_ref
     create_run(db, child, ("retry_after_failure" if previous and previous.status == "failed" else "rework") if data.reuse_branch_of else "initial")
     db.add(AgentEvent(session_id=child.id, kind="message", source="native", payload={"role": "user", "text": data.prompt}))
     db.commit()

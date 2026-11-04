@@ -5589,3 +5589,134 @@ i.stats-series-4 {
 .efficiency-tasks th {
   white-space: nowrap;
 }
+
+/* Session file browser */
+.session-files {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+.session-files-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 0.9rem;
+}
+.session-files-crumbs button {
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  color: var(--accent);
+  cursor: pointer;
+}
+.session-files-share,
+.session-files-refresh {
+  margin-left: auto;
+}
+.session-files-refresh {
+  margin-left: 8px;
+}
+.session-files-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+.session-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border-right: 1px solid var(--border-subtle);
+}
+.session-files-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.session-files-list button:hover,
+.session-files-list button.active {
+  background: var(--bg-hover);
+}
+.session-files-list small {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.session-files-preview {
+  overflow: auto;
+  min-width: 0;
+  padding-top: 4px;
+}
+.session-files-actions {
+  margin-bottom: 8px;
+}
+.session-files-image {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+.session-files-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+@media (max-width: 700px) {
+  .session-files-body {
+    grid-template-columns: 1fr;
+  }
+  .session-files-list {
+    border-right: 0;
+    max-height: 40vh;
+  }
+}
+
+/* A page that threw: the error and a way out instead of an empty screen */
+.error-boundary {
+  max-width: 720px;
+  margin: 24px auto;
+}
+.error-boundary pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--status-error);
+}
+.error-boundary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-files-panel {
+  height: calc(100dvh - 260px);
+  min-height: 420px;
+}
+@media (max-width: 700px) {
+  .project-files-panel {
+    height: auto;
+  }
+}
+
+.session-files-go {
+  display: flex;
+  gap: 8px;
+}
+.session-files-go input {
+  flex: 1;
+  min-width: 0;
+}
